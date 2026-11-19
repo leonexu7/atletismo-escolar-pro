@@ -28,6 +28,7 @@ import { OFFICIAL_EVENTS, isTrackEvent, isFieldEvent } from '../constants/events
 import { SCHOOL_CATEGORIES, PARTICIPATION_LIMITS } from '../constants/categories';
 import { downloadExcelRegistrationTemplate, parseExcelAthletesFile } from '../utils/excelHandler';
 import RelayBuilderModal from './RelayBuilderModal';
+import defaultBannerLogo from '../assets/puebla_sep_banner.jpg';
 
 export default function TeacherRegistrationView({
   tournament,
@@ -278,8 +279,19 @@ export default function TeacherRegistrationView({
     return matchesSearch && matchesGender;
   });
 
+  const activeLogo = tournament?.customLogo || defaultBannerLogo;
+
   return (
     <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 space-y-4">
+      {/* Logotipo Institucional Oficial del Encabezado */}
+      <div className="w-full bg-white border border-slate-200/90 rounded-2xl p-2.5 sm:p-3.5 flex items-center justify-center shadow-2xs overflow-hidden">
+        <img
+          src={activeLogo}
+          alt="Gobierno del Estado de Puebla - Secretaría de Educación Pública"
+          className="h-12 sm:h-16 md:h-18 w-auto max-w-full object-contain"
+        />
+      </div>
+
       {/* Aviso de Éxito */}
       {successNotice && (
         <div className="bg-emerald-50 border border-emerald-300 text-emerald-800 px-4 py-2.5 rounded-2xl text-xs font-semibold flex items-center space-x-2 animate-in fade-in shadow-xs">

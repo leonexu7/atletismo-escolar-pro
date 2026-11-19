@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
-import { Settings, X, Save, RotateCcw, Download, Upload, AlertTriangle, Check, Shield } from 'lucide-react';
+import { Settings, X, Save, RotateCcw, Download, Upload, AlertTriangle, Check, Shield, Image } from 'lucide-react';
 import { exportTournamentBackupToFile, importTournamentFromFile } from '../utils/storage';
+import defaultBannerLogo from '../assets/puebla_sep_banner.jpg';
 
 export default function TournamentSettingsModal({
   isOpen,
@@ -13,11 +14,30 @@ export default function TournamentSettingsModal({
 }) {
   const [formData, setFormData] = useState({ ...tournament });
   const fileInputRef = useRef(null);
+  const logoInputRef = useRef(null);
 
   if (!isOpen) return null;
 
   const handleChange = (field, val) => {
     setFormData(prev => ({ ...prev, [field]: val }));
+  };
+
+  const handleLogoUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      alert('Por favor selecciona un archivo de imagen válido (PNG, JPG, SVG, WebP).');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const base64Data = ev.target.result;
+      setFormData(prev => ({ ...prev, customLogo: base64Data }));
+    };
+    reader.readAsDataURL(file);
+    if (logoInputRef.current) logoInputRef.current.value = '';
   };
 
   const handleSave = (e) => {
@@ -152,6 +172,80 @@ export default function TournamentSettingsModal({
                 </div>
               </label>
             </div>
+          </div>
+
+          {/* Configuración de Logotipo Institucional (Requerimiento Usuario) */}
+          <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200 space-y-3">
+            <div className="flex items-center justify-between">
+              <label className="block text-xs font-bold text-slate-800">
+                Logotipo Institucional de Encabezado:
+              </label>
+              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                formData.customLogo
+                  ? 'bg-sky-100 text-sky-800 border border-sky-300'
+                  : 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+              }`}>
+                {formData.customLogo ? 'Personalizado' : 'Oficial Puebla (Predeterminado)'}
+              </span>
+            </div>
+
+            {/* Vista Previa del Logotipo */}
+            <div className="bg-white border border-slate-200 rounded-xl p-2.5 flex items-center justify-center min-h-[70px]">
+              <img
+                src={formData.customLogo || defaultBannerLogo}
+                alt="Vista previa logotipo"
+                className="max-h-16 w-auto max-w-full object-contain"
+              />
+            </div>
+
+            {/* Acciones para cambiar o restablecer */}
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => logoInputRef.current?.click()}
+                className="flex-1 py-1.5 px-3 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-xl text-xs font-semibold flex items-center justify-center space-x-1.5 shadow-2xs transition-colors"
+              >
+                <Image className="w-3.5 h-3.5 text-sky-600" />
+                <span>{formData.customLogo ? 'Cambiar por otra Imagen' : 'Subir Imagen Personalizada'}</span>
+              </button>
+              <input
+                ref={logoInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleLogoUpload}
+              />
+
+              {formData.customLogo && (
+                <button
+                  type="button"
+                  onClick={() => handleChange('customLogo', null)}
+                  className="py-1.5 px-3 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs font-semibold flex items-center space-x-1 transition-colors"
+                  title="Restablecer al logotipo oficial de Puebla"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  <span>Restablecer Puebla</span>
+                </button>
+              )}
+            </div>
+
+            {/* Botón para mostrar en Mesa de Control */}
+            <label className="flex items-center justify-between pt-2 border-t border-slate-200/80 cursor-pointer">
+              <div className="pr-3">
+                <span className="text-xs font-bold text-slate-800 block">
+                  Mostrar Logotipo también en la Mesa de Control
+                </span>
+                <span className="text-[11px] text-slate-500 block">
+                  Por defecto solo aparece en el Registro de Alumnos. Activa esta casilla para mostrarlo también en la pantalla de control.
+                </span>
+              </div>
+              <input
+                type="checkbox"
+                checked={Boolean(formData.showLogoInControlDesk)}
+                onChange={(e) => handleChange('showLogoInControlDesk', e.target.checked)}
+                className="rounded text-rose-600 focus:ring-rose-400 h-4 w-4 shrink-0"
+              />
+            </label>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
