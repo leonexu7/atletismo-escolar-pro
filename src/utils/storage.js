@@ -19,7 +19,8 @@ export const DEFAULT_TOURNAMENT_INFO = {
   activeCategory: 'primaria_abierta',
   categoryGroupingMode: 'unified', // 'unified' = Categoría Única (Solo Varonil y Femenil sin separar por edades) | 'by_grades' = Dividir por Grados (3°-4° y 5°-6°)
   customLogo: null, // Logotipo personalizado en Base64 (si es null, usa el logotipo oficial del Gobierno de Puebla / SEP)
-  showLogoInControlDesk: false // Botón en ajustes: permite activarlo también en la Mesa de Control
+  showLogoInControlDesk: false, // Botón en ajustes: permite activarlo también en la Mesa de Control
+  enableDiplomas: false // Opción en ajustes para activar/desactivar la emisión de diplomas de ganadores
 };
 
 export function loadTournamentState() {

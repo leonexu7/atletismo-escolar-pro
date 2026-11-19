@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Settings, X, Save, RotateCcw, Download, Upload, AlertTriangle, Check, Shield, Image } from 'lucide-react';
+import { Settings, X, Save, RotateCcw, Download, Upload, AlertTriangle, Check, Shield, Image, Award } from 'lucide-react';
 import { exportTournamentBackupToFile, importTournamentFromFile } from '../utils/storage';
 import defaultBannerLogo from '../assets/puebla_sep_banner.jpg';
 
@@ -244,6 +244,27 @@ export default function TournamentSettingsModal({
                 checked={Boolean(formData.showLogoInControlDesk)}
                 onChange={(e) => handleChange('showLogoInControlDesk', e.target.checked)}
                 className="rounded text-rose-600 focus:ring-rose-400 h-4 w-4 shrink-0"
+              />
+            </label>
+          </div>
+
+          {/* Opción de Diplomas de Premiación (Activar / Desactivar) */}
+          <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200 space-y-2">
+            <label className="flex items-center justify-between cursor-pointer">
+              <div className="pr-3">
+                <span className="text-xs font-bold text-slate-800 flex items-center space-x-1.5">
+                  <Award className="w-4 h-4 text-amber-500" />
+                  <span>Activar Impresión de Diplomas de Ganadores</span>
+                </span>
+                <span className="text-[11px] text-slate-500 block mt-0.5">
+                  Por defecto está desactivada para simplificar la interfaz. Actívala si necesitas generar e imprimir diplomas oficiales en PDF para los medallistas.
+                </span>
+              </div>
+              <input
+                type="checkbox"
+                checked={Boolean(formData.enableDiplomas)}
+                onChange={(e) => handleChange('enableDiplomas', e.target.checked)}
+                className="rounded text-amber-600 focus:ring-amber-400 h-4 w-4 shrink-0"
               />
             </label>
           </div>

@@ -297,14 +297,16 @@ export default function ControlDeskView({
                     <span>Ver Podio</span>
                   </button>
 
-                  <button
-                    onClick={() => handlePrintDiplomas(ev)}
-                    title="Imprimir Diplomas Oficiales en PDF"
-                    className="py-1.5 px-3 bg-rose-500 hover:bg-rose-600 text-white rounded-xl text-xs font-bold transition-colors shadow-2xs flex items-center space-x-1"
-                  >
-                    <Printer className="w-3.5 h-3.5" />
-                    <span>Diplomas</span>
-                  </button>
+                  {tournament?.enableDiplomas && (
+                    <button
+                      onClick={() => handlePrintDiplomas(ev)}
+                      title="Imprimir Diplomas Oficiales en PDF"
+                      className="py-1.5 px-3 bg-rose-500 hover:bg-rose-600 text-white rounded-xl text-xs font-bold transition-colors shadow-2xs flex items-center space-x-1"
+                    >
+                      <Printer className="w-3.5 h-3.5" />
+                      <span>Diplomas</span>
+                    </button>
+                  )}
 
                   {isCompleted && (
                     <button

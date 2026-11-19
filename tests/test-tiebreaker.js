@@ -6,6 +6,7 @@ import { evaluateFieldAttempts, rankFieldEventCompetitors, rankTrackEventRunners
 import { formatTrackTime, parseTrackTime, formatFieldDistance, parseFieldDistance } from '../src/utils/timeFormatter.js';
 import { PARTICIPATION_LIMITS } from '../src/constants/categories.js';
 import { cleanCCT, cleanSchoolName, findExistingSchoolMatch } from '../src/utils/schoolNormalizer.js';
+import { DEFAULT_TOURNAMENT_INFO } from '../src/utils/storage.js';
 
 console.log('🧪 Iniciando pruebas de Atletismo Escolar Pro...\n');
 
@@ -104,6 +105,10 @@ assert(match1.isMatch === true && match1.matchType === 'cct', 'Debe detectar dup
 const candidateWithoutCCT = { name: 'PRIMARIA BENITO JUAREZ', cct: '', zone: '04' };
 const match2 = findExistingSchoolMatch(existingSchools, candidateWithoutCCT);
 assert(match2.isMatch === true && match2.matchType === 'name', 'Debe detectar duplicado por nombre normalizado aunque cambien mayúsculas y acentos');
+
+// --- PRUEBA 7: Opción de Diplomas en Ajustes (Desactivada por Defecto) ---
+console.log('\n📌 Verificando Configuración de Diplomas:');
+assert(DEFAULT_TOURNAMENT_INFO.enableDiplomas === false, 'Diplomas deben estar desactivados por defecto');
 
 console.log('\n----------------------------------------');
 if (failedTests === 0) {

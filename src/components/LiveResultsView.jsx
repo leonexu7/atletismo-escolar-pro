@@ -276,16 +276,18 @@ export default function LiveResultsView({
           </div>
         </div>
 
-        {/* Botón Diplomas */}
-        <div className="mt-6 flex justify-center">
-          <button
-            onClick={handlePrintDiplomas}
-            className="px-5 py-2.5 bg-rose-500 hover:bg-rose-600 text-white font-bold text-xs rounded-xl shadow-xs flex items-center space-x-1.5 transition-colors"
-          >
-            <Printer className="w-4 h-4" />
-            <span>Imprimir Diplomas Oficiales en PDF</span>
-          </button>
-        </div>
+        {/* Botón Diplomas (Condicionado por Ajustes: tournament?.enableDiplomas) */}
+        {tournament?.enableDiplomas && (
+          <div className="mt-6 flex justify-center">
+            <button
+              onClick={handlePrintDiplomas}
+              className="px-5 py-2.5 bg-rose-500 hover:bg-rose-600 text-white font-bold text-xs rounded-xl shadow-xs flex items-center space-x-1.5 transition-colors"
+            >
+              <Printer className="w-4 h-4" />
+              <span>Imprimir Diplomas Oficiales en PDF</span>
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Tabla Completa de Posiciones */}
