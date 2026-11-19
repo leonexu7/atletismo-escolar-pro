@@ -113,14 +113,26 @@ export default function TeacherRegistrationView({
       next = currentList.filter(id => id !== eventId);
     } else {
       const ev = OFFICIAL_EVENTS.find(e => e.id === eventId);
-      const isIndividual = ev?.type !== 'relevo';
+      const isIndividual = ev?.type !== 'relevo' && !eventId.includes('relevo');
+      const isRelay = ev?.type === 'relevo' || eventId.includes('relevo');
+
       const currentIndividuals = currentList.filter(id => {
         const item = OFFICIAL_EVENTS.find(e => e.id === id);
-        return item?.type !== 'relevo';
+        return item?.type !== 'relevo' && !id.includes('relevo');
+      });
+
+      const currentRelays = currentList.filter(id => {
+        const item = OFFICIAL_EVENTS.find(e => e.id === id);
+        return item?.type === 'relevo' || id.includes('relevo');
       });
 
       if (isIndividual && currentIndividuals.length >= PARTICIPATION_LIMITS.MAX_INDIVIDUAL_EVENTS) {
-        alert(`Reglamento Escolar: Máximo ${PARTICIPATION_LIMITS.MAX_INDIVIDUAL_EVENTS} pruebas individuales por alumno.`);
+        alert(`Reglamento del Torneo: Máximo ${PARTICIPATION_LIMITS.MAX_INDIVIDUAL_EVENTS} pruebas individuales por alumno.`);
+        return;
+      }
+
+      if (isRelay && currentRelays.length >= PARTICIPATION_LIMITS.MAX_RELAY_EVENTS) {
+        alert(`Reglamento del Torneo: Máximo ${PARTICIPATION_LIMITS.MAX_RELAY_EVENTS} pruebas de equipo / relevos por alumno.`);
         return;
       }
 
@@ -852,10 +864,23 @@ export default function TeacherRegistrationView({
                               if (isAlready) {
                                 next = current.filter(id => id !== ev.id);
                               } else {
-                                const isIndividual = ev.type !== 'relevo';
-                                const indivs = current.filter(id => OFFICIAL_EVENTS.find(e => e.id === id)?.type !== 'relevo');
+                                const isIndividual = ev.type !== 'relevo' && !ev.id.includes('relevo');
+                                const isRelay = ev.type === 'relevo' || ev.id.includes('relevo');
+                                const indivs = current.filter(id => {
+                                  const item = OFFICIAL_EVENTS.find(e => e.id === id);
+                                  return item?.type !== 'relevo' && !id.includes('relevo');
+                                });
+                                const relays = current.filter(id => {
+                                  const item = OFFICIAL_EVENTS.find(e => e.id === id);
+                                  return item?.type === 'relevo' || id.includes('relevo');
+                                });
+
                                 if (isIndividual && indivs.length >= PARTICIPATION_LIMITS.MAX_INDIVIDUAL_EVENTS) {
-                                  alert(`Máximo ${PARTICIPATION_LIMITS.MAX_INDIVIDUAL_EVENTS} pruebas individuales.`);
+                                  alert(`Reglamento del Torneo: Máximo ${PARTICIPATION_LIMITS.MAX_INDIVIDUAL_EVENTS} pruebas individuales.`);
+                                  return;
+                                }
+                                if (isRelay && relays.length >= PARTICIPATION_LIMITS.MAX_RELAY_EVENTS) {
+                                  alert(`Reglamento del Torneo: Máximo ${PARTICIPATION_LIMITS.MAX_RELAY_EVENTS} pruebas de equipo / relevos.`);
                                   return;
                                 }
                                 next = [...current, ev.id];

@@ -4,6 +4,7 @@
 
 import { evaluateFieldAttempts, rankFieldEventCompetitors, rankTrackEventRunners } from '../src/utils/tieBreaker.js';
 import { formatTrackTime, parseTrackTime, formatFieldDistance, parseFieldDistance } from '../src/utils/timeFormatter.js';
+import { PARTICIPATION_LIMITS } from '../src/constants/categories.js';
 
 console.log('🧪 Iniciando pruebas de Atletismo Escolar Pro...\n');
 
@@ -76,6 +77,12 @@ const rankedTrack = rankTrackEventRunners(runners);
 assert(rankedTrack[0].fullName === 'Pedro', 'Pedro debe ser 1º por menor tiempo (10.45s vs 10.80s)');
 assert(rankedTrack[1].fullName === 'Carlos', 'Carlos debe ser 2º');
 assert(rankedTrack[2].rank === 'DNS', 'El corredor que no se presentó debe quedar al final como DNS');
+
+// --- PRUEBA 5: Límite de Inscripciones (2 Individuales y 2 Equipos Máximo) ---
+console.log('\n📌 Verificando Regla de Inscripciones (2 Individuales y 2 Equipos Máximo):');
+assert(PARTICIPATION_LIMITS.MAX_INDIVIDUAL_EVENTS === 2, 'Límite de pruebas individuales debe ser 2');
+assert(PARTICIPATION_LIMITS.MAX_RELAY_EVENTS === 2, 'Límite de pruebas de equipo/relevos debe ser 2');
+assert(PARTICIPATION_LIMITS.MAX_TOTAL_EVENTS === 4, 'Límite total combinado de pruebas debe ser 4');
 
 console.log('\n----------------------------------------');
 if (failedTests === 0) {

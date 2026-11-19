@@ -37,8 +37,9 @@ export const SCHOOL_CATEGORIES = [
 ];
 
 export const PARTICIPATION_LIMITS = {
-  MAX_INDIVIDUAL_EVENTS: 2, // Máximo 2 pruebas individuales por alumno (norma CONDEBA)
-  MAX_RELAY_EVENTS: 1,      // Máximo 1 relevo por alumno
+  MAX_INDIVIDUAL_EVENTS: 2, // Máximo 2 pruebas individuales por alumno
+  MAX_RELAY_EVENTS: 2,      // Máximo 2 pruebas de equipo / relevos por alumno
+  MAX_TOTAL_EVENTS: 4,      // Máximo 4 eventos en total (2 individuales + 2 equipos)
   ALLOW_OVERRIDE: true      // El admin puede ajustar o desactivar el límite si el torneo es libre
 };
 

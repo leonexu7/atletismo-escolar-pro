@@ -156,8 +156,23 @@ export default function AthletesRosterView({
     if (current.includes(eventId)) {
       updated = current.filter(id => id !== eventId);
     } else {
-      if (current.length >= 3) {
-        alert('Un alumno puede participar como máximo en 2 pruebas individuales y relevo.');
+      const ev = OFFICIAL_EVENTS.find(e => e.id === eventId);
+      const isRelay = ev?.type === 'relevo' || eventId.includes('relevo');
+      const indivCount = current.filter(id => {
+        const item = OFFICIAL_EVENTS.find(e => e.id === id);
+        return item?.type !== 'relevo' && !id.includes('relevo');
+      }).length;
+      const relayCount = current.filter(id => {
+        const item = OFFICIAL_EVENTS.find(e => e.id === id);
+        return item?.type === 'relevo' || id.includes('relevo');
+      }).length;
+
+      if (!isRelay && indivCount >= 2) {
+        alert('Reglamento del Torneo: Máximo 2 pruebas individuales por competidor.');
+        return;
+      }
+      if (isRelay && relayCount >= 2) {
+        alert('Reglamento del Torneo: Máximo 2 pruebas de equipo / relevos por competidor.');
         return;
       }
       updated = [...current, eventId];
@@ -650,7 +665,7 @@ export default function AthletesRosterView({
               {/* Selección de Pruebas */}
               <div>
                 <label className="font-bold text-slate-700 block mb-1.5">
-                  Pruebas Asignadas (Máximo 2 individuales + relevo):
+                  Pruebas Asignadas (Máximo 2 individuales y 2 de equipo/relevos):
                 </label>
                 <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto p-2 bg-slate-50 rounded-xl border border-slate-200">
                   {OFFICIAL_EVENTS.map(ev => {

@@ -48,6 +48,16 @@ export default function RelayBuilderModal({
       return;
     }
 
+    // Regla del Torneo: Máximo 2 equipos de relevos por competidor
+    for (const athId of titulares) {
+      const alreadyInRelays = existingRelays.filter(r => r.eventId !== activeEvent.id && (r.members || []).includes(athId)).length;
+      if (alreadyInRelays >= 2) {
+        const ath = schoolAthletes.find(a => a.id === athId);
+        setErrorMsg(`El alumno ${ath?.fullName || 'seleccionado'} ya está inscrito en 2 equipos de relevos (máximo 2 por competidor).`);
+        return;
+      }
+    }
+
     if (activeEvent.id === 'relevo_4x75m_mixto') {
       const p1 = schoolAthletes.find(a => a.id === members.pos1);
       const p2 = schoolAthletes.find(a => a.id === members.pos2);

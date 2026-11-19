@@ -17,7 +17,7 @@ export function downloadExcelRegistrationTemplate() {
     ['1. Capture los datos de sus alumnos en la hoja "Atletas".'],
     ['2. En la columna "Sexo", use "M" para Varonil o "F" para Femenil.'],
     ['3. En las columnas de pruebas, marque con una "X" o "SI" las pruebas en las que participará el alumno.'],
-    ['4. Máximo 2 pruebas individuales por alumno según el reglamento escolar CONDEBA.'],
+    ['4. Máximo 2 pruebas individuales y máximo 2 pruebas de equipo / relevos por alumno.'],
     [''],
     ['CATÁLOGO DE PRUEBAS DISPONIBLES:'],
     ['Código', 'Nombre Oficial de la Prueba', 'Tipo', 'Reglas'],
