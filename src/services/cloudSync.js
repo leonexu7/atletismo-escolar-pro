@@ -14,17 +14,31 @@ import {
   updateDoc
 } from '@firebase/firestore';
 
-const CLOUD_STORAGE_KEY = 'atletismo_cloud_session_v1';
+const CUSTOM_FIREBASE_KEY = 'atletismo_custom_firebase_config';
 
-// Configuración Firebase activa predeterminada (heredada de la infraestructura del usuario o personalizada)
-export const DEFAULT_FIREBASE_CONFIG = {
-  apiKey: "AIzaSyBAv_Ofl7V497CO278BmyGruwPzPpQmaXY",
-  authDomain: "torneo--de-karate.firebaseapp.com",
-  projectId: "torneo--de-karate",
-  storageBucket: "torneo--de-karate.firebasestorage.app",
-  messagingSenderId: "439672085234",
-  appId: "1:439672085234:web:c85cc9d8125c6c81248e6b"
-};
+/**
+ * Obtiene la configuración de Firebase de forma segura.
+ * Prioriza variables de entorno o configuración personalizada en localStorage.
+ */
+export function getActiveFirebaseConfig() {
+  try {
+    const saved = localStorage.getItem(CUSTOM_FIREBASE_KEY);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (parsed.apiKey && parsed.projectId) return parsed;
+    }
+  } catch (_) {}
+
+  // Si no hay configuración manual en localStorage, intenta leer de variables de entorno seguras
+  return {
+    apiKey: (typeof import.meta !== 'undefined' && import.meta.env?.VITE_FIREBASE_API_KEY) || "",
+    authDomain: (typeof import.meta !== 'undefined' && import.meta.env?.VITE_FIREBASE_AUTH_DOMAIN) || "",
+    projectId: (typeof import.meta !== 'undefined' && import.meta.env?.VITE_FIREBASE_PROJECT_ID) || "",
+    storageBucket: (typeof import.meta !== 'undefined' && import.meta.env?.VITE_FIREBASE_STORAGE_BUCKET) || "",
+    messagingSenderId: (typeof import.meta !== 'undefined' && import.meta.env?.VITE_FIREBASE_MESSAGING_SENDER_ID) || "",
+    appId: (typeof import.meta !== 'undefined' && import.meta.env?.VITE_FIREBASE_APP_ID) || ""
+  };
+}
 
 let firestoreInstance = null;
 
@@ -32,7 +46,13 @@ export function getFirestoreDB() {
   if (firestoreInstance) return firestoreInstance;
 
   try {
-    const app = getApps().length === 0 ? initializeApp(DEFAULT_FIREBASE_CONFIG) : getApp();
+    const config = getActiveFirebaseConfig();
+    // Si no cuenta con una API key válida configurada, opera limpiamente en Modo Local / Offline
+    if (!config || !config.apiKey || !config.projectId) {
+      return null;
+    }
+
+    const app = getApps().length === 0 ? initializeApp(config) : getApp();
     firestoreInstance = getFirestore(app);
     return firestoreInstance;
   } catch (err) {
