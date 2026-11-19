@@ -23,6 +23,7 @@ import {
 import { OFFICIAL_EVENTS, isTrackEvent, isFieldEvent } from '../constants/events';
 import { exportMasterAthletesRosterToExcel } from '../utils/excelHandler';
 import { generateMasterAthletesRosterPDF } from '../utils/pdfGenerator';
+import { calculateAge } from '../utils/timeFormatter';
 
 export default function AthletesRosterView({
   tournament,
@@ -492,7 +493,14 @@ export default function AthletesRosterView({
                       <td className="py-3 px-3.5 text-center text-slate-600 font-medium">
                         <div>{athlete.schoolGrade ? `${athlete.schoolGrade}° Primaria` : '-'}</div>
                         {athlete.birthDate && (
-                          <div className="text-[10px] text-slate-400">{athlete.birthDate}</div>
+                          <div className="text-[10px] text-slate-500 font-medium">
+                            {athlete.birthDate}
+                            {calculateAge(athlete.birthDate) !== null && (
+                              <span className="font-bold text-slate-800 ml-1">
+                                ({calculateAge(athlete.birthDate)} años)
+                              </span>
+                            )}
+                          </div>
                         )}
                       </td>
 
@@ -648,18 +656,35 @@ export default function AthletesRosterView({
                 </div>
                 <div>
                   <label className="font-bold text-slate-700 block mb-1">
-                    Escuela de Procedencia
+                    Fecha Nacimiento:
+                    {editingAthlete.birthDate && calculateAge(editingAthlete.birthDate) !== null && (
+                      <span className="text-indigo-600 font-extrabold ml-1.5">
+                        ({calculateAge(editingAthlete.birthDate)} años)
+                      </span>
+                    )}
                   </label>
-                  <select
-                    value={editingAthlete.schoolId || ''}
-                    onChange={(e) => setEditingAthlete({ ...editingAthlete, schoolId: e.target.value })}
+                  <input
+                    type="date"
+                    value={editingAthlete.birthDate || ''}
+                    onChange={(e) => setEditingAthlete({ ...editingAthlete, birthDate: e.target.value })}
                     className="w-full px-3 py-2 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400"
-                  >
-                    {schools.map(sch => (
-                      <option key={sch.id} value={sch.id}>{sch.name}</option>
-                    ))}
-                  </select>
+                  />
                 </div>
+              </div>
+
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">
+                  Escuela de Procedencia
+                </label>
+                <select
+                  value={editingAthlete.schoolId || ''}
+                  onChange={(e) => setEditingAthlete({ ...editingAthlete, schoolId: e.target.value })}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                >
+                  {schools.map(sch => (
+                    <option key={sch.id} value={sch.id}>{sch.name}</option>
+                  ))}
+                </select>
               </div>
 
               {/* Selección de Pruebas */}

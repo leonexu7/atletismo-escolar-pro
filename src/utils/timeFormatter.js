@@ -92,3 +92,70 @@ export function parseFieldDistance(input) {
 
   return null;
 }
+
+/**
+ * Calcula la edad exacta en años a partir de una fecha de nacimiento (YYYY-MM-DD, DD/MM/YYYY o Date).
+ * Evita desfases de husos horarios ISO UTC mediante desglose directo de componentes.
+ * Retorna un número entero o null si la fecha no es válida.
+ */
+export function calculateAge(birthDateInput, referenceDate = new Date()) {
+  if (!birthDateInput) return null;
+
+  let birthYear, birthMonth, birthDay;
+
+  if (typeof birthDateInput === 'string') {
+    const trimmed = birthDateInput.trim();
+    if (!trimmed) return null;
+
+    // Caso YYYY-MM-DD o YYYY/MM/DD
+    if (/^\d{4}[-/]\d{1,2}[-/]\d{1,2}/.test(trimmed)) {
+      const parts = trimmed.split(/[-/]/).map(Number);
+      birthYear = parts[0];
+      birthMonth = parts[1] - 1;
+      birthDay = parts[2];
+    }
+    // Caso DD/MM/YYYY o DD-MM-YYYY
+    else if (/^\d{1,2}[-/]\d{1,2}[-/]\d{4}/.test(trimmed)) {
+      const parts = trimmed.split(/[-/]/).map(Number);
+      birthDay = parts[0];
+      birthMonth = parts[1] - 1;
+      birthYear = parts[2];
+    } else {
+      const parsed = new Date(trimmed);
+      if (isNaN(parsed.getTime())) return null;
+      birthYear = parsed.getFullYear();
+      birthMonth = parsed.getMonth();
+      birthDay = parsed.getDate();
+    }
+  } else if (birthDateInput instanceof Date) {
+    if (isNaN(birthDateInput.getTime())) return null;
+    birthYear = birthDateInput.getFullYear();
+    birthMonth = birthDateInput.getMonth();
+    birthDay = birthDateInput.getDate();
+  } else {
+    return null;
+  }
+
+  const ref = referenceDate instanceof Date ? referenceDate : new Date(referenceDate);
+  if (isNaN(ref.getTime())) return null;
+
+  let age = ref.getFullYear() - birthYear;
+  const monthDiff = ref.getMonth() - birthMonth;
+
+  if (monthDiff < 0 || (monthDiff === 0 && ref.getDate() < birthDay)) {
+    age--;
+  }
+
+  return age >= 0 && age <= 120 ? age : null;
+}
+
+/**
+ * Formatea la fecha de nacimiento agregando la edad calculada a un lado.
+ * Ejemplo: "2014-03-15 (12 años)"
+ */
+export function formatBirthDateWithAge(birthDateInput) {
+  if (!birthDateInput) return '';
+  const age = calculateAge(birthDateInput);
+  if (age === null) return String(birthDateInput);
+  return `${birthDateInput} (${age} años)`;
+}

@@ -29,6 +29,7 @@ import {
 import { OFFICIAL_EVENTS, isTrackEvent, isFieldEvent } from '../constants/events';
 import { SCHOOL_CATEGORIES, PARTICIPATION_LIMITS } from '../constants/categories';
 import { downloadExcelRegistrationTemplate, parseExcelAthletesFile } from '../utils/excelHandler';
+import { calculateAge } from '../utils/timeFormatter';
 import RelayBuilderModal from './RelayBuilderModal';
 import SchoolSelectorModal from './SchoolSelectorModal';
 
@@ -547,7 +548,14 @@ export default function TeacherRegistrationView({
               </div>
 
               <div>
-                <label className="block font-semibold text-slate-700 mb-1">Fecha Nacimiento:</label>
+                <label className="block font-semibold text-slate-700 mb-1">
+                  Fecha Nacimiento:
+                  {athleteForm.birthDate && calculateAge(athleteForm.birthDate) !== null && (
+                    <span className="text-rose-600 font-extrabold ml-1.5">
+                      ({calculateAge(athleteForm.birthDate)} años)
+                    </span>
+                  )}
+                </label>
                 <input
                   type="date"
                   value={athleteForm.birthDate}
@@ -688,7 +696,16 @@ export default function TeacherRegistrationView({
                             ? `Primaria Única (${ath.gender === 'F' ? 'Femenil' : 'Varonil'})`
                             : (ath.categoryId === 'infantil_menor' ? 'Inf. Menor (3°-4°)' : 'Inf. Mayor (5°-6°)')}
                         </strong></span>
-                        {ath.birthDate && <span>Nac: <strong>{ath.birthDate}</strong></span>}
+                        {ath.birthDate && (
+                          <span>
+                            Nac: <strong className="text-slate-700">{ath.birthDate}</strong>
+                            {calculateAge(ath.birthDate) !== null && (
+                              <span className="text-slate-800 font-bold ml-1">
+                                ({calculateAge(ath.birthDate)} años)
+                              </span>
+                            )}
+                          </span>
+                        )}
                       </div>
 
                       {/* Chips de Pruebas */}
@@ -855,7 +872,14 @@ export default function TeacherRegistrationView({
                 </div>
 
                 <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Fecha Nacimiento:</label>
+                  <label className="block font-semibold text-slate-700 mb-1">
+                    Fecha Nacimiento:
+                    {editingAthlete.birthDate && calculateAge(editingAthlete.birthDate) !== null && (
+                      <span className="text-rose-600 font-extrabold ml-1.5">
+                        ({calculateAge(editingAthlete.birthDate)} años)
+                      </span>
+                    )}
+                  </label>
                   <input
                     type="date"
                     value={editingAthlete.birthDate || ''}

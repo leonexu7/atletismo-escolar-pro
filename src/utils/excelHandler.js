@@ -5,6 +5,7 @@
 
 import * as XLSX from 'xlsx';
 import { OFFICIAL_EVENTS } from '../constants/events';
+import { formatBirthDateWithAge } from './timeFormatter';
 
 export function downloadExcelRegistrationTemplate() {
   const wb = XLSX.utils.book_new();
@@ -123,7 +124,7 @@ export function exportMasterAthletesRosterToExcel(athletes = [], schools = [], t
       ath.fullName,
       ath.gender === 'F' ? 'Femenil' : 'Varonil',
       ath.schoolGrade ? `${ath.schoolGrade}°` : '-',
-      ath.birthDate || '-',
+      formatBirthDateWithAge(ath.birthDate) || '-',
       ath.curp || '-',
       school?.name || ath.schoolName || 'Sin Escuela',
       school?.zone || '-',

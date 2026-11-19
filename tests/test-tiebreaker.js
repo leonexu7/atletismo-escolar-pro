@@ -3,7 +3,7 @@
  */
 
 import { evaluateFieldAttempts, rankFieldEventCompetitors, rankTrackEventRunners } from '../src/utils/tieBreaker.js';
-import { formatTrackTime, parseTrackTime, formatFieldDistance, parseFieldDistance } from '../src/utils/timeFormatter.js';
+import { formatTrackTime, parseTrackTime, formatFieldDistance, parseFieldDistance, calculateAge, formatBirthDateWithAge } from '../src/utils/timeFormatter.js';
 import { PARTICIPATION_LIMITS } from '../src/constants/categories.js';
 import { cleanCCT, cleanSchoolName, findExistingSchoolMatch } from '../src/utils/schoolNormalizer.js';
 import { DEFAULT_TOURNAMENT_INFO } from '../src/utils/storage.js';
@@ -109,6 +109,16 @@ assert(match2.isMatch === true && match2.matchType === 'name', 'Debe detectar du
 // --- PRUEBA 7: Opción de Diplomas en Ajustes (Desactivada por Defecto) ---
 console.log('\n📌 Verificando Configuración de Diplomas:');
 assert(DEFAULT_TOURNAMENT_INFO.enableDiplomas === false, 'Diplomas deben estar desactivados por defecto');
+
+// --- PRUEBA 8: Cálculo Automático de Edad a partir de Fecha de Nacimiento ---
+console.log('\n📌 Verificando Cálculo Automático de Edad:');
+const refDate = new Date(2026, 10, 19); // 19 de noviembre de 2026
+assert(calculateAge('2014-03-15', refDate) === 12, 'Nacido 2014-03-15 tiene 12 años en nov 2026');
+assert(calculateAge('2013-11-08', refDate) === 13, 'Nacido 2013-11-08 tiene 13 años en nov 2026');
+assert(calculateAge('2013-11-25', refDate) === 12, 'Nacido 2013-11-25 tiene 12 años en nov 19 2026 (aún no cumple 13)');
+assert(calculateAge('15/03/2014', refDate) === 12, 'Formato DD/MM/YYYY debe calcularse correctamente');
+assert(formatBirthDateWithAge('2014-03-15').includes('años'), 'formatBirthDateWithAge debe incluir la fecha y la edad');
+assert(calculateAge('') === null, 'Fecha vacía debe retornar null');
 
 console.log('\n----------------------------------------');
 if (failedTests === 0) {
