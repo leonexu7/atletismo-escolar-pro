@@ -20,7 +20,6 @@ import { OFFICIAL_EVENTS, isFieldEvent, isTrackEvent } from '../constants/events
 import { computeTournamentEventStatus } from '../utils/athleticsEngine';
 import { generateAwardsDiplomasPDF } from '../utils/pdfGenerator';
 import { evaluateFieldAttempts, rankFieldEventCompetitors, rankTrackEventRunners } from '../utils/tieBreaker';
-import defaultBannerLogo from '../assets/puebla_sep_banner.jpg';
 
 export default function ControlDeskView({
   tournament,
@@ -95,17 +94,6 @@ export default function ControlDeskView({
 
   return (
     <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-5 space-y-5">
-      {/* Logotipo Institucional Opcional en Mesa de Control */}
-      {tournament?.showLogoInControlDesk && (
-        <div className="w-full bg-white border border-slate-200/90 rounded-2xl p-2.5 sm:p-3.5 flex items-center justify-center shadow-2xs overflow-hidden">
-          <img
-            src={tournament?.customLogo || defaultBannerLogo}
-            alt="Logotipo Oficial"
-            className="h-12 sm:h-16 md:h-18 w-auto max-w-full object-contain"
-          />
-        </div>
-      )}
-
       {/* Barra Superior de Navegación Rápida */}
       <div className="flex items-center justify-between">
         {onReturnToRegistration && (

@@ -1,6 +1,5 @@
 import React from 'react';
 import {
-  Flame,
   Timer,
   Ruler,
   LayoutDashboard,
@@ -14,6 +13,8 @@ import {
   Calendar,
   MapPin
 } from 'lucide-react';
+import runnerSilhouette from '../assets/runner_silhouette.png';
+import defaultBannerLogo from '../assets/puebla_sep_banner.jpg';
 
 export default function Navbar({
   activeTab,
@@ -27,6 +28,11 @@ export default function Navbar({
   cloudSession,
   readyAwardsCount = 0
 }) {
+  const shouldShowInstitutionalHeader =
+    activeTab === 'registration' || (activeTab === 'control_desk' && tournament?.showLogoInControlDesk);
+
+  const activeLogo = tournament?.customLogo || defaultBannerLogo;
+
   const tabs = [
     { id: 'registration', label: 'Inscripciones (Maestros)', shortLabel: 'Maestros', icon: Users, requiresAdmin: false },
     { id: 'track_judge', label: 'Juez de Pista', shortLabel: 'Pista', icon: Timer, requiresAdmin: false },
@@ -52,7 +58,18 @@ export default function Navbar({
 
   return (
     <header className="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-xs">
-      {/* Barra superior delgada con identidad institucional */}
+      {/* 1. Logotipo Institucional Oficial como ENCABEZADO REAL (Arriba del título de Juegos Deportivos Escolares) */}
+      {shouldShowInstitutionalHeader && (
+        <div className="bg-white border-b border-slate-200/90 py-2 sm:py-2.5 px-3 sm:px-6 flex items-center justify-center transition-all">
+          <img
+            src={activeLogo}
+            alt="Gobierno del Estado de Puebla - Secretaría de Educación Pública"
+            className="h-9 sm:h-12 md:h-14 w-auto max-w-full object-contain"
+          />
+        </div>
+      )}
+
+      {/* 2. Barra con el título oficial de los Juegos Escolares Deportivos */}
       <div className="bg-slate-900 text-white px-3 sm:px-6 py-1.5 flex flex-wrap items-center justify-between gap-2 text-xs">
         <div className="flex items-center space-x-2 truncate">
           <span className="font-semibold text-white tracking-wide truncate">
@@ -123,13 +140,17 @@ export default function Navbar({
       {/* Barra de Navegación Principal en Blanco y Pastel */}
       <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-14">
-          {/* Logotipo */}
+          {/* Logotipo Oficial con Silueta de Corredor Formal */}
           <div
             className="flex items-center space-x-2.5 cursor-pointer flex-shrink-0"
             onClick={() => onSelectTab('registration')}
           >
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-rose-500 to-amber-500 text-white flex items-center justify-center shadow-sm">
-              <Flame className="w-5 h-5 text-white" />
+            <div className="w-9 h-9 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center p-1.5 shadow-2xs hover:bg-slate-200/80 transition-colors">
+              <img
+                src={runnerSilhouette}
+                alt="Silueta de Corredor Formal"
+                className="w-full h-full object-contain"
+              />
             </div>
             <div>
               <span className="font-extrabold text-sm sm:text-base tracking-tight text-slate-900 block leading-tight">
