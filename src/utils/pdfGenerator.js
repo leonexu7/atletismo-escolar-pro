@@ -1,0 +1,299 @@
+/**
+ * Generador Oficial de Documentos y Diplomas en PDF para Atletismo Escolar
+ * - Planillas de Jueces de Pista (Series y Carriles)
+ * - Planillas de Jueces de Campo (3 Intentos y Mejor Marca)
+ * - Diplomas de Premiación personalizados en 1 Clic
+ * - Memoria Técnica Oficial del Evento
+ */
+
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import { formatTrackTime, formatFieldDistance } from './timeFormatter';
+
+/**
+ * Genera la Planilla Oficial de Jueces de Pista en orientación Horizontal
+ */
+export function generateOfficialTrackSheetPDF(event, heats = [], tournamentInfo = {}) {
+  const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'letter' });
+  const pageWidth = doc.internal.pageSize.getWidth();
+
+  // Encabezado institucional deportivo
+  doc.setFillColor(15, 23, 42); // slate-900
+  doc.rect(0, 0, pageWidth, 24, 'F');
+
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(14);
+  doc.setFont('helvetica', 'bold');
+  doc.text(String(tournamentInfo.name || 'JUEGOS DEPORTIVOS ESCOLARES DE ATLETISMO').toUpperCase(), 14, 10);
+
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(226, 232, 240);
+  doc.text(`PLANILLA TÉCNICA OFICIAL DE PISTA  |  PRUEBA: ${String(event.name || '').toUpperCase()}`, 14, 18);
+
+  // Metadatos del evento
+  doc.setTextColor(30, 41, 59);
+  doc.setFontSize(9);
+  doc.text(`Sede: ${tournamentInfo.venue || 'Estadio Escolar'}`, 14, 30);
+  doc.text(`Fecha: ${tournamentInfo.date || ''}`, 120, 30);
+  doc.text(`Organizador: ${tournamentInfo.organizer || 'Comité Organizador'}`, 200, 30);
+
+  let currentY = 34;
+
+  if (heats.length === 0) {
+    doc.setFontSize(11);
+    doc.setTextColor(100, 116, 139);
+    doc.text('No hay series configuradas para esta prueba.', 14, 45);
+  } else {
+    heats.forEach((heat, heatIdx) => {
+      // Subtítulo de Serie
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(185, 28, 28); // red-700
+      doc.text(`SERIE ${heat.heatNumber || heatIdx + 1}`, 14, currentY + 4);
+
+      const tableBody = (heat.lanes || []).map(lane => [
+        lane.assignedLane || '-',
+        lane.bibNumber || lane.dorsal || 'S/N',
+        lane.fullName || 'Competidor',
+        lane.schoolName || 'Escuela',
+        '', // Espacio para tiempo manual
+        '', // Espacio para lugar
+        ''  // Observaciones (DNS/DNF/DQ)
+      ]);
+
+      autoTable(doc, {
+        startY: currentY + 6,
+        head: [['Carril', 'Dorsal', 'Nombre del Alumno / Corredor', 'Escuela de Procedencia', 'Tiempo Oficial', 'Lugar', 'Notas / Faltas']],
+        body: tableBody,
+        theme: 'grid',
+        styles: { fontSize: 9, cellPadding: 2.5 },
+        headStyles: { fillColor: [30, 41, 59], textColor: [255, 255, 255], fontStyle: 'bold' },
+        columnStyles: {
+          0: { cellWidth: 16, halign: 'center' },
+          1: { cellWidth: 18, halign: 'center' },
+          2: { cellWidth: 80 },
+          3: { cellWidth: 70 },
+          4: { cellWidth: 30, halign: 'center' },
+          5: { cellWidth: 18, halign: 'center' },
+          6: { cellWidth: 28 }
+        },
+        margin: { left: 14, right: 14 }
+      });
+
+      currentY = doc.lastAutoTable.finalY + 8;
+      if (currentY > 175 && heatIdx < heats.length - 1) {
+        doc.addPage();
+        currentY = 20;
+      }
+    });
+  }
+
+  // Cuadro de firmas reglamentarias
+  const footY = 190;
+  doc.setDrawColor(148, 163, 184);
+  doc.setLineWidth(0.3);
+  doc.line(30, footY, 90, footY);
+  doc.line(180, footY, 240, footY);
+
+  doc.setFontSize(8);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(71, 85, 105);
+  doc.text('Juez de Salida / Cronometrador', 60, footY + 4, { align: 'center' });
+  doc.text('Juez Árbitro de Pista', 210, footY + 4, { align: 'center' });
+
+  doc.save(`Planilla_Pista_${event.shortName || 'carrera'}.pdf`);
+}
+
+/**
+ * Genera la Planilla Oficial de Jueces de Campo (Saltos y Lanzamientos con 3 Intentos)
+ */
+export function generateOfficialFieldSheetPDF(event, flight = [], tournamentInfo = {}) {
+  const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'letter' });
+  const pageWidth = doc.internal.pageSize.getWidth();
+
+  // Encabezado institucional
+  doc.setFillColor(4, 120, 87); // emerald-700
+  doc.rect(0, 0, pageWidth, 24, 'F');
+
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(14);
+  doc.setFont('helvetica', 'bold');
+  doc.text(String(tournamentInfo.name || 'JUEGOS DEPORTIVOS ESCOLARES DE ATLETISMO').toUpperCase(), 14, 10);
+
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(209, 250, 229);
+  doc.text(`PLANILLA OFICIAL DE CONCURSO DE CAMPO  |  PRUEBA: ${String(event.name || '').toUpperCase()}`, 14, 18);
+
+  // Metadatos
+  doc.setTextColor(30, 41, 59);
+  doc.setFontSize(9);
+  doc.text(`Sede: ${tournamentInfo.venue || 'Campo Escolar'}`, 14, 30);
+  doc.text(`Reglamento: 3 Intentos oficiales. Gana la MEJOR marca válida.`, 110, 30);
+  doc.text(`Fecha: ${tournamentInfo.date || ''}`, 220, 30);
+
+  const tableBody = (flight || []).map((athlete, idx) => [
+    idx + 1,
+    athlete.bibNumber || athlete.dorsal || 'S/N',
+    athlete.fullName || 'Competidor',
+    athlete.schoolName || 'Escuela',
+    '', // Intento 1
+    '', // Intento 2
+    '', // Intento 3
+    '', // Mejor Marca
+    '', // 2ª Mejor Marca
+    ''  // Lugar final
+  ]);
+
+  autoTable(doc, {
+    startY: 34,
+    head: [[
+      'Orden',
+      'Dorsal',
+      'Nombre del Alumno / Lanzador / Saltador',
+      'Escuela',
+      'Intento 1',
+      'Intento 2',
+      'Intento 3',
+      'MEJOR MARCA',
+      '2ª Marca',
+      'Lugar'
+    ]],
+    body: tableBody,
+    theme: 'grid',
+    styles: { fontSize: 8.5, cellPadding: 2.5 },
+    headStyles: { fillColor: [4, 120, 87], textColor: [255, 255, 255], fontStyle: 'bold' },
+    columnStyles: {
+      0: { cellWidth: 14, halign: 'center' },
+      1: { cellWidth: 16, halign: 'center' },
+      2: { cellWidth: 70 },
+      3: { cellWidth: 55 },
+      4: { cellWidth: 20, halign: 'center' },
+      5: { cellWidth: 20, halign: 'center' },
+      6: { cellWidth: 20, halign: 'center' },
+      7: { cellWidth: 26, halign: 'center', fontStyle: 'bold' },
+      8: { cellWidth: 20, halign: 'center' },
+      9: { cellWidth: 16, halign: 'center' }
+    },
+    margin: { left: 14, right: 14 }
+  });
+
+  // Firmas
+  const footY = 190;
+  doc.setDrawColor(148, 163, 184);
+  doc.setLineWidth(0.3);
+  doc.line(30, footY, 90, footY);
+  doc.line(180, footY, 240, footY);
+
+  doc.setFontSize(8);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(71, 85, 105);
+  doc.text('Juez Jefe de Prueba de Campo', 60, footY + 4, { align: 'center' });
+  doc.text('Juez Árbitro General', 210, footY + 4, { align: 'center' });
+
+  doc.save(`Planilla_Campo_${event.shortName || 'concurso'}.pdf`);
+}
+
+/**
+ * Genera Diplomas Oficiales de Premiación (1º, 2º y 3º lugar) listos para entregar
+ */
+export function generateAwardsDiplomasPDF(winners = [], event = {}, tournamentInfo = {}) {
+  if (!winners || winners.length === 0) return;
+
+  const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'letter' });
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+
+  const medalConfig = {
+    1: { name: 'PRIMER LUGAR (MEDALLA DE ORO)', color: [217, 119, 6], ribbon: 'CAMPEÓN' },
+    2: { name: 'SEGUNDO LUGAR (MEDALLA DE PLATA)', color: [100, 116, 139], ribbon: 'SUB-CAMPEÓN' },
+    3: { name: 'TERCER LUGAR (MEDALLA DE BRONCE)', color: [180, 83, 9], ribbon: 'TERCER LUGAR' }
+  };
+
+  winners.slice(0, 3).forEach((winner, idx) => {
+    if (idx > 0) doc.addPage();
+
+    const place = idx + 1;
+    const config = medalConfig[place] || medalConfig[1];
+
+    // Marco exterior ceremonial
+    doc.setDrawColor(config.color[0], config.color[1], config.color[2]);
+    doc.setLineWidth(3);
+    doc.rect(10, 10, pageWidth - 20, pageHeight - 20);
+
+    doc.setLineWidth(0.8);
+    doc.rect(13, 13, pageWidth - 26, pageHeight - 26);
+
+    // Encabezado
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(16);
+    doc.setTextColor(15, 23, 42);
+    doc.text(String(tournamentInfo.name || 'JUEGOS DEPORTIVOS ESCOLARES DE ATLETISMO').toUpperCase(), pageWidth / 2, 30, { align: 'center' });
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(11);
+    doc.setTextColor(71, 85, 105);
+    doc.text('EL COMITÉ ORGANIZADOR Y LA SUPERVISIÓN DE EDUCACIÓN FÍSICA OTORGAN EL PRESENTE', pageWidth / 2, 40, { align: 'center' });
+
+    // Título DIPLOMA DE RECONOCIMIENTO
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(28);
+    doc.setTextColor(config.color[0], config.color[1], config.color[2]);
+    doc.text('DIPLOMA DE PREMIACIÓN', pageWidth / 2, 54, { align: 'center' });
+
+    // Distinción de lugar
+    doc.setFontSize(14);
+    doc.setTextColor(30, 41, 59);
+    doc.text(`POR HABER OBTENIDO EL ${config.name}`, pageWidth / 2, 66, { align: 'center' });
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(12);
+    doc.text('A:', pageWidth / 2, 78, { align: 'center' });
+
+    // Nombre del alumno premiado
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(24);
+    doc.setTextColor(185, 28, 28); // red-700
+    doc.text(String(winner.fullName || 'Alumno Competidor').toUpperCase(), pageWidth / 2, 92, { align: 'center' });
+
+    // Escuela
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(13);
+    doc.setTextColor(51, 65, 85);
+    doc.text(`Representando a: ${winner.schoolName || 'Escuela Primaria'}`, pageWidth / 2, 104, { align: 'center' });
+
+    // Detalles de la prueba y marca oficial
+    const markLabel = winner.markFormatted || (winner.bestMark ? formatFieldDistance(winner.bestMark) : formatTrackTime(winner.timeSeconds));
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(14);
+    doc.setTextColor(15, 23, 42);
+    doc.text(`En la prueba: ${event.name || 'Prueba Oficial'}`, pageWidth / 2, 118, { align: 'center' });
+    doc.text(`Con una marca / tiempo oficial de: ${markLabel}`, pageWidth / 2, 126, { align: 'center' });
+
+    if (winner.tieNote) {
+      doc.setFont('helvetica', 'italic');
+      doc.setFontSize(9);
+      doc.setTextColor(100, 116, 139);
+      doc.text(`* ${winner.tieNote}`, pageWidth / 2, 134, { align: 'center' });
+    }
+
+    // Fecha y firmas
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    doc.setTextColor(71, 85, 105);
+    doc.text(`${tournamentInfo.venue || 'Ciudad'}, a ${tournamentInfo.date || '2026'}`, pageWidth / 2, 146, { align: 'center' });
+
+    const signY = 175;
+    doc.setLineWidth(0.4);
+    doc.setDrawColor(100, 116, 139);
+    doc.line(40, signY, 110, signY);
+    doc.line(pageWidth - 110, signY, pageWidth - 40, signY);
+
+    doc.setFontSize(9);
+    doc.text('Coordinador General de Educación Física', 75, signY + 5, { align: 'center' });
+    doc.text('Juez Árbitro Oficial del Torneo', pageWidth - 75, signY + 5, { align: 'center' });
+  });
+
+  doc.save(`Diplomas_${event.shortName || 'Premiacion'}.pdf`);
+}
