@@ -9,7 +9,11 @@ import {
   Sparkles,
   Info,
   XCircle,
-  MinusCircle
+  MinusCircle,
+  Search,
+  Lock,
+  Unlock,
+  X
 } from 'lucide-react';
 import { OFFICIAL_EVENTS, isFieldEvent } from '../constants/events';
 import { formatFieldDistance, parseFieldDistance } from '../utils/timeFormatter';
@@ -22,12 +26,15 @@ export default function FieldJudgeView({
   schools = [],
   results = {},
   onSaveFieldResult,
-  onOpenLiveResults
+  onOpenLiveResults,
+  isAdmin = false,
+  onOpenAdminLogin
 }) {
   const fieldEvents = OFFICIAL_EVENTS.filter(e => isFieldEvent(e.id));
 
   const [selectedEventId, setSelectedEventId] = useState('campo_longitud');
   const [selectedGender, setSelectedGender] = useState('M');
+  const [searchTerm, setSearchTerm] = useState('');
 
   const activeEvent = fieldEvents.find(e => e.id === selectedEventId) || fieldEvents[0];
 
@@ -46,6 +53,17 @@ export default function FieldJudgeView({
       };
     });
   }, [athletes, schools, activeEvent.id, selectedGender]);
+
+  // Filtrado de competidores por el buscador
+  const displayedAthletes = useMemo(() => {
+    if (!searchTerm.trim()) return eligibleAthletes;
+    const term = searchTerm.toLowerCase().trim();
+    return eligibleAthletes.filter(ath =>
+      ath.fullName.toLowerCase().includes(term) ||
+      String(ath.bibNumber || '').includes(term) ||
+      (ath.schoolName && ath.schoolName.toLowerCase().includes(term))
+    );
+  }, [eligibleAthletes, searchTerm]);
 
   const eventResults = results[activeEvent.id] || {};
   const currentFieldEntries = eventResults.fieldEntries || [];
@@ -72,6 +90,7 @@ export default function FieldJudgeView({
   };
 
   const handleAttemptChange = (athleteId, attemptIdx, rawValue) => {
+    if (!isAdmin) return;
     const current = [...getAthleteAttempts(athleteId)];
     current[attemptIdx] = {
       ...current[attemptIdx],
@@ -86,6 +105,7 @@ export default function FieldJudgeView({
   };
 
   const handleSetQuickStatus = (athleteId, attemptIdx, statusType) => {
+    if (!isAdmin) return;
     const current = [...getAthleteAttempts(athleteId)];
     current[attemptIdx] = {
       ...current[attemptIdx],
@@ -100,6 +120,11 @@ export default function FieldJudgeView({
   };
 
   const handleSaveAllMarks = () => {
+    if (!isAdmin) {
+      if (onOpenAdminLogin) onOpenAdminLogin();
+      return;
+    }
+
     const updatedEntries = eligibleAthletes.map(athlete => {
       const attemptsState = getAthleteAttempts(athlete.id);
 
@@ -162,6 +187,40 @@ export default function FieldJudgeView({
 
   return (
     <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-5 space-y-5">
+      {/* Banner de Modo Solo Lectura / Control de Acceso Oficial */}
+      {!isAdmin ? (
+        <div className="bg-amber-50/80 border border-amber-200 text-amber-900 px-4 py-3 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
+          <div className="flex items-center space-x-2.5">
+            <Lock className="w-4 h-4 text-amber-700 shrink-0" />
+            <div>
+              <span className="text-xs font-bold block">
+                Modo Consulta (Solo Lectura) — Modificación Bloqueada
+              </span>
+              <span className="text-[11px] text-amber-800">
+                Cualquier persona puede ver las marcas, pero solo los jueces autorizados con contraseña de Mesa de Control pueden registrar o modificar intentos oficiales.
+              </span>
+            </div>
+          </div>
+          {onOpenAdminLogin && (
+            <button
+              type="button"
+              onClick={onOpenAdminLogin}
+              className="px-3.5 py-1.5 bg-slate-900 hover:bg-black text-white text-xs font-bold rounded-xl shrink-0 flex items-center space-x-1.5 shadow-2xs transition-colors self-start sm:self-auto"
+            >
+              <Unlock className="w-3.5 h-3.5 text-amber-400" />
+              <span>Desbloquear Captura</span>
+            </button>
+          )}
+        </div>
+      ) : (
+        <div className="bg-emerald-50/80 border border-emerald-200 text-emerald-900 px-4 py-2.5 rounded-2xl flex items-center justify-between text-xs">
+          <div className="flex items-center space-x-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+            <span className="font-semibold">Mesa de Control activa — Modo Juez de Campo autorizado para captura y edición</span>
+          </div>
+        </div>
+      )}
+
       {/* Selector de Prueba de Campo Pastel */}
       <div className="bg-white border border-slate-200/90 rounded-2xl p-4 sm:p-6 shadow-xs">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
@@ -248,25 +307,53 @@ export default function FieldJudgeView({
       {/* Planilla de Captura de los 3 Intentos */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
         <div className="lg:col-span-8 bg-white border border-slate-200/90 rounded-2xl p-4 sm:p-6 shadow-xs space-y-4">
-          <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-slate-100 gap-2">
             <div>
               <h3 className="font-bold text-sm sm:text-base text-slate-900">
                 {activeEvent.name} ({selectedGender === 'M' ? 'Varonil' : 'Femenil'})
               </h3>
               <p className="text-xs text-slate-500">Ingresa la distancia en metros (ej. 3.85)</p>
             </div>
-            <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
-              {eligibleAthletes.length} Participantes
+            <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 self-start sm:self-auto">
+              {displayedAthletes.length !== eligibleAthletes.length
+                ? `${displayedAthletes.length} de ${eligibleAthletes.length} Participantes`
+                : `${eligibleAthletes.length} Participantes`}
             </span>
           </div>
 
-          {eligibleAthletes.length === 0 ? (
-            <div className="text-center py-10 text-slate-400 text-xs italic">
-              No hay atletas registrados en {activeEvent.name} para esta rama.
+          {/* Buscador de Competidores de Campo */}
+          <div className="relative">
+            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5 pointer-events-none" />
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Buscar competidor por nombre, número de dorsal o escuela..."
+              className="w-full pl-9 pr-9 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:bg-white transition-all"
+            />
+            {searchTerm && (
+              <button
+                type="button"
+                onClick={() => setSearchTerm('')}
+                className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600 p-0.5"
+                title="Limpiar búsqueda"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+
+          {displayedAthletes.length === 0 ? (
+            <div className="text-center py-10 text-slate-400 text-xs italic bg-slate-50/50 rounded-xl border border-dashed border-slate-200">
+              {searchTerm ? (
+                <span>No se encontraron competidores que coincidan con &ldquo;<strong>{searchTerm}</strong>&rdquo;.</span>
+              ) : (
+                <span>No hay atletas registrados en {activeEvent.name} para esta rama.</span>
+              )}
             </div>
           ) : (
             <div className="space-y-3">
-              {eligibleAthletes.map((athlete) => {
+              {displayedAthletes.map((athlete) => {
                 const athleteAttempts = getAthleteAttempts(athlete.id);
                 const parsedForDisplay = athleteAttempts.map(a => ({
                   value: a.status === 'valid' ? parseFieldDistance(a.valStr) : null,
@@ -320,7 +407,9 @@ export default function FieldJudgeView({
                           <div
                             key={attemptIdx}
                             className={`p-2 rounded-xl border flex flex-col justify-between ${
-                              isFoul
+                              !isAdmin
+                                ? 'bg-slate-100/70 border-slate-200'
+                                : isFoul
                                 ? 'bg-rose-50/60 border-rose-200'
                                 : isPass
                                 ? 'bg-slate-100 border-slate-200'
@@ -336,18 +425,28 @@ export default function FieldJudgeView({
                               <div className="flex space-x-1">
                                 <button
                                   type="button"
+                                  disabled={!isAdmin}
                                   onClick={() => handleSetQuickStatus(athlete.id, attemptIdx, 'foul')}
                                   className={`px-1.5 py-0.2 rounded text-[10px] font-bold transition-all ${
-                                    isFoul ? 'bg-rose-500 text-white' : 'bg-slate-100 text-slate-600 hover:text-rose-600'
+                                    !isAdmin
+                                      ? 'opacity-40 cursor-not-allowed bg-slate-200 text-slate-400'
+                                      : isFoul
+                                      ? 'bg-rose-500 text-white'
+                                      : 'bg-slate-100 text-slate-600 hover:text-rose-600'
                                   }`}
                                 >
                                   NULO
                                 </button>
                                 <button
                                   type="button"
+                                  disabled={!isAdmin}
                                   onClick={() => handleSetQuickStatus(athlete.id, attemptIdx, 'pass')}
                                   className={`px-1.5 py-0.2 rounded text-[10px] font-bold transition-all ${
-                                    isPass ? 'bg-slate-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                    !isAdmin
+                                      ? 'opacity-40 cursor-not-allowed bg-slate-200 text-slate-400'
+                                      : isPass
+                                      ? 'bg-slate-600 text-white'
+                                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                                   }`}
                                 >
                                   PASA
@@ -359,14 +458,17 @@ export default function FieldJudgeView({
                               <input
                                 type="text"
                                 value={att.valStr}
+                                readOnly={!isAdmin}
                                 onChange={(e) => handleAttemptChange(athlete.id, attemptIdx, e.target.value)}
                                 placeholder="0.00"
-                                className={`w-full bg-white border text-center font-athletic text-2xl font-bold rounded-lg py-1 px-2 focus:ring-2 focus:ring-emerald-400 outline-none transition-all ${
-                                  isFoul
-                                    ? 'border-rose-300 text-rose-600 font-bold'
+                                className={`w-full border text-center font-athletic text-2xl font-bold rounded-lg py-1 px-2 focus:ring-2 focus:ring-emerald-400 outline-none transition-all ${
+                                  !isAdmin
+                                    ? 'bg-slate-100/90 border-slate-200 text-slate-700 cursor-not-allowed'
+                                    : isFoul
+                                    ? 'bg-white border-rose-300 text-rose-600 font-bold'
                                     : isPass
-                                    ? 'border-slate-300 text-slate-400 font-bold'
-                                    : 'border-slate-200 text-slate-900'
+                                    ? 'bg-white border-slate-300 text-slate-400 font-bold'
+                                    : 'bg-white border-slate-200 text-slate-900'
                                 }`}
                               />
                               <span className="absolute right-2 top-2 text-[10px] text-slate-400 font-bold">m</span>
@@ -382,13 +484,25 @@ export default function FieldJudgeView({
           )}
 
           <div className="pt-3 flex justify-end">
-            <button
-              onClick={handleSaveAllMarks}
-              className="px-5 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-xs rounded-xl shadow-xs flex items-center space-x-2 transition-all"
-            >
-              <Send className="w-3.5 h-3.5" />
-              <span>Guardar Intentos y Notificar a Mesa</span>
-            </button>
+            {!isAdmin ? (
+              <button
+                type="button"
+                onClick={onOpenAdminLogin}
+                className="px-5 py-2.5 bg-slate-900 hover:bg-black text-white font-bold text-xs rounded-xl shadow-xs flex items-center space-x-2 transition-all"
+              >
+                <Lock className="w-3.5 h-3.5 text-amber-400" />
+                <span>Iniciar Sesión para Modificar Marcas</span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handleSaveAllMarks}
+                className="px-5 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-xs rounded-xl shadow-xs flex items-center space-x-2 transition-all"
+              >
+                <Send className="w-3.5 h-3.5" />
+                <span>Guardar Intentos y Notificar a Mesa</span>
+              </button>
+            )}
           </div>
         </div>
 

@@ -10,7 +10,11 @@ import {
   Flag,
   Award,
   Clock,
-  Sparkles
+  Sparkles,
+  Search,
+  Lock,
+  Unlock,
+  X
 } from 'lucide-react';
 import { OFFICIAL_EVENTS, isTrackEvent } from '../constants/events';
 import { formatTrackTime, parseTrackTime } from '../utils/timeFormatter';
@@ -25,7 +29,9 @@ export default function TrackJudgeView({
   schools = [],
   results = {},
   onSaveTrackResult,
-  onOpenLiveResults
+  onOpenLiveResults,
+  isAdmin = false,
+  onOpenAdminLogin
 }) {
   const trackEvents = OFFICIAL_EVENTS.filter(e => isTrackEvent(e.id));
 
@@ -33,6 +39,7 @@ export default function TrackJudgeView({
   const [selectedGender, setSelectedGender] = useState('M');
   const [selectedHeatIndex, setSelectedHeatIndex] = useState(0);
   const [isStopwatchOpen, setIsStopwatchOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
 
   const activeEvent = trackEvents.find(e => e.id === selectedEventId) || trackEvents[0];
 
@@ -65,6 +72,42 @@ export default function TrackJudgeView({
 
   const activeHeat = heats[selectedHeatIndex] || heats[0] || { lanes: [] };
 
+  // Filtrado por buscador en la serie actual
+  const displayedLanes = useMemo(() => {
+    const lanes = activeHeat.lanes || [];
+    if (!searchTerm.trim()) return lanes;
+    const term = searchTerm.toLowerCase().trim();
+    return lanes.filter(ath =>
+      ath.fullName.toLowerCase().includes(term) ||
+      String(ath.bibNumber || '').includes(term) ||
+      (ath.schoolName && ath.schoolName.toLowerCase().includes(term))
+    );
+  }, [activeHeat.lanes, searchTerm]);
+
+  // Búsqueda inteligente en otras series para acceso inmediato
+  const matchingOtherHeats = useMemo(() => {
+    if (!searchTerm.trim()) return [];
+    const term = searchTerm.toLowerCase().trim();
+    const resultsInOtherHeats = [];
+    heats.forEach((h, hIdx) => {
+      if (hIdx === selectedHeatIndex) return;
+      (h.lanes || []).forEach(ath => {
+        if (
+          ath.fullName.toLowerCase().includes(term) ||
+          String(ath.bibNumber || '').includes(term) ||
+          (ath.schoolName && ath.schoolName.toLowerCase().includes(term))
+        ) {
+          resultsInOtherHeats.push({
+            ...ath,
+            heatIndex: hIdx,
+            heatName: h.name
+          });
+        }
+      });
+    });
+    return resultsInOtherHeats;
+  }, [heats, selectedHeatIndex, searchTerm]);
+
   const eventResults = results[activeEvent.id] || {};
   const currentTrackEntries = eventResults.trackEntries || [];
 
@@ -82,6 +125,7 @@ export default function TrackJudgeView({
   };
 
   const handleTimeChange = (athleteId, val) => {
+    if (!isAdmin) return;
     setLocalTimes(prev => ({
       ...prev,
       [athleteId]: val
@@ -89,6 +133,7 @@ export default function TrackJudgeView({
   };
 
   const handleStatusChange = (athleteId, newStatus) => {
+    if (!isAdmin) return;
     const runner = eligibleAthletes.find(a => a.id === athleteId);
     if (!runner) return;
 
@@ -104,6 +149,11 @@ export default function TrackJudgeView({
   };
 
   const handleSaveHeat = () => {
+    if (!isAdmin) {
+      if (onOpenAdminLogin) onOpenAdminLogin();
+      return;
+    }
+
     const updatedEntries = [...currentTrackEntries];
 
     (activeHeat.lanes || []).forEach(athlete => {
@@ -133,6 +183,7 @@ export default function TrackJudgeView({
   };
 
   const handleApplyStopwatchSplits = (splits) => {
+    if (!isAdmin) return;
     const newLocal = { ...localTimes };
     (activeHeat.lanes || []).forEach(athlete => {
       const laneNum = athlete.assignedLane;
@@ -164,7 +215,41 @@ export default function TrackJudgeView({
   }, [eligibleAthletes, currentTrackEntries, localTimes]);
 
   return (
-    <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-5 space-y-5">
+    <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-5 space-y-4">
+      {/* Banner de Modo Solo Lectura / Control de Acceso Oficial */}
+      {!isAdmin ? (
+        <div className="bg-amber-50/80 border border-amber-200 text-amber-900 px-4 py-3 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
+          <div className="flex items-center space-x-2.5">
+            <Lock className="w-4 h-4 text-amber-700 shrink-0" />
+            <div>
+              <span className="text-xs font-bold block">
+                Modo Consulta (Solo Lectura) — Modificación Bloqueada
+              </span>
+              <span className="text-[11px] text-amber-800">
+                Cualquier persona puede ver los tiempos, pero solo los jueces autorizados con contraseña de Mesa de Control pueden capturar o modificar marcas oficiales.
+              </span>
+            </div>
+          </div>
+          {onOpenAdminLogin && (
+            <button
+              type="button"
+              onClick={onOpenAdminLogin}
+              className="px-3.5 py-1.5 bg-slate-900 hover:bg-black text-white text-xs font-bold rounded-xl shrink-0 flex items-center space-x-1.5 shadow-2xs transition-colors self-start sm:self-auto"
+            >
+              <Unlock className="w-3.5 h-3.5 text-amber-400" />
+              <span>Desbloquear Captura</span>
+            </button>
+          )}
+        </div>
+      ) : (
+        <div className="bg-emerald-50/70 border border-emerald-200 text-emerald-800 px-4 py-2.5 rounded-2xl flex items-center space-x-2 text-xs shadow-2xs">
+          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+          <span className="font-semibold">
+            Sesión de Juez Oficial Activa: Tienes permisos para cronometrar, capturar y modificar marcas de pista.
+          </span>
+        </div>
+      )}
+
       {/* Selector de Prueba de Pista Pastel */}
       <div className="bg-white border border-slate-200/90 rounded-2xl p-4 sm:p-6 shadow-xs">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
@@ -176,7 +261,9 @@ export default function TrackJudgeView({
               <h2 className="text-base sm:text-lg font-bold text-slate-900">
                 Juez de Pista (Carreras y Velocidad)
               </h2>
-              <p className="text-xs text-slate-500">Captura de tiempos en segundos y centésimas</p>
+              <p className="text-xs text-slate-500">
+                Captura oficial de tiempos en segundos y centésimas
+              </p>
             </div>
           </div>
 
@@ -214,6 +301,7 @@ export default function TrackJudgeView({
                   setSelectedEventId(ev.id);
                   setSelectedHeatIndex(0);
                   setLocalTimes({});
+                  setSearchTerm('');
                 }}
                 className={`p-2.5 rounded-xl border text-center transition-all ${
                   isSelected
@@ -230,6 +318,56 @@ export default function TrackJudgeView({
           })}
         </div>
       </div>
+
+      {/* Buscador de Competidores en Pista */}
+      <div className="bg-white border border-slate-200/90 rounded-2xl p-3 sm:p-4 shadow-2xs flex flex-col sm:flex-row items-center gap-3">
+        <div className="relative flex-1 w-full">
+          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+          <input
+            type="text"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="Buscar competidor por nombre, escuela o número de dorsal..."
+            className="w-full pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 placeholder:text-slate-400 focus:bg-white focus:ring-2 focus:ring-rose-400 outline-none transition-all"
+          />
+          {searchTerm && (
+            <button
+              onClick={() => setSearchTerm('')}
+              className="absolute right-2.5 top-2 text-slate-400 hover:text-slate-600 p-0.5 rounded-full"
+              title="Limpiar búsqueda"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
+
+        {searchTerm && (
+          <div className="text-xs text-slate-500 whitespace-nowrap self-start sm:self-auto">
+            <span>En serie activa: <strong className="text-slate-800">{displayedLanes.length}</strong></span>
+          </div>
+        )}
+      </div>
+
+      {/* Coincidencias en otras series para acceso inmediato */}
+      {matchingOtherHeats.length > 0 && (
+        <div className="bg-sky-50 border border-sky-200 rounded-xl p-3 text-xs flex flex-wrap items-center gap-2 animate-in fade-in">
+          <span className="font-bold text-sky-800">
+            Competidor encontrado en otra serie:
+          </span>
+          {matchingOtherHeats.map((ath) => (
+            <button
+              key={`${ath.id}-${ath.heatIndex}`}
+              onClick={() => {
+                setSelectedHeatIndex(ath.heatIndex);
+              }}
+              className="px-2.5 py-1 bg-white hover:bg-sky-100 border border-sky-300 rounded-lg text-sky-800 font-semibold text-[11px] flex items-center space-x-1 transition-colors shadow-2xs"
+            >
+              <span>{ath.fullName} (#{ath.bibNumber || 'S/N'})</span>
+              <span className="text-sky-600 font-bold">→ Ir a {ath.heatName}</span>
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Selector de Serie y Acciones */}
       <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-white border border-slate-200/90 rounded-2xl p-3.5 shadow-xs">
@@ -256,11 +394,17 @@ export default function TrackJudgeView({
 
         <div className="flex space-x-2 w-full sm:w-auto justify-end">
           <button
-            onClick={() => setIsStopwatchOpen(true)}
+            onClick={() => {
+              if (!isAdmin) {
+                if (onOpenAdminLogin) onOpenAdminLogin();
+                return;
+              }
+              setIsStopwatchOpen(true);
+            }}
             className="px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded-xl text-xs font-bold flex items-center space-x-1.5 transition-colors"
           >
             <Clock className="w-3.5 h-3.5" />
-            <span>Cronómetro</span>
+            <span>{isAdmin ? 'Cronómetro' : 'Cronómetro (Bloqueado)'}</span>
           </button>
 
           <button
@@ -282,20 +426,24 @@ export default function TrackJudgeView({
                 <Flag className="w-4 h-4 text-rose-500" />
                 <span>{activeHeat.name || 'Serie 1'}</span>
               </h3>
-              <p className="text-xs text-slate-500">Ingresa el tiempo en segundos (ej. 10.52)</p>
+              <p className="text-xs text-slate-500">
+                {isAdmin ? 'Ingresa el tiempo oficial en segundos (ej. 10.52)' : 'Modo consulta de tiempos'}
+              </p>
             </div>
             <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700">
-              {activeHeat.lanes?.length || 0} Corredores
+              {displayedLanes.length} Corredores {searchTerm && '(Filtrados)'}
             </span>
           </div>
 
-          {(!activeHeat.lanes || activeHeat.lanes.length === 0) ? (
+          {displayedLanes.length === 0 ? (
             <div className="text-center py-10 text-slate-400 text-xs italic">
-              No hay atletas registrados en esta serie para {activeEvent.name}.
+              {searchTerm
+                ? `No se encontraron corredores con "${searchTerm}" en esta serie.`
+                : `No hay atletas registrados en esta serie para ${activeEvent.name}.`}
             </div>
           ) : (
             <div className="space-y-2.5">
-              {activeHeat.lanes.map((athlete) => {
+              {displayedLanes.map((athlete) => {
                 const currentTime = getRunnerTime(athlete.id);
                 const currentStatus = getRunnerStatus(athlete.id);
 
@@ -326,11 +474,13 @@ export default function TrackJudgeView({
                           value={currentTime}
                           onChange={(e) => handleTimeChange(athlete.id, e.target.value)}
                           placeholder="00.00"
-                          disabled={currentStatus !== 'valid'}
-                          className={`w-28 bg-white border text-center font-athletic text-2xl font-bold rounded-xl py-1 px-2 focus:ring-2 focus:ring-rose-400 outline-none transition-all ${
-                            currentStatus === 'valid'
-                              ? 'border-slate-300 text-slate-900'
-                              : 'border-slate-200 text-slate-400 line-through bg-slate-100'
+                          readOnly={!isAdmin || currentStatus !== 'valid'}
+                          className={`w-28 border text-center font-athletic text-2xl font-bold rounded-xl py-1 px-2 outline-none transition-all ${
+                            !isAdmin
+                              ? 'bg-slate-100 border-slate-200 text-slate-700 cursor-not-allowed'
+                              : currentStatus === 'valid'
+                              ? 'bg-white border-slate-300 text-slate-900 focus:ring-2 focus:ring-rose-400'
+                              : 'bg-slate-100 border-slate-200 text-slate-400 line-through'
                           }`}
                         />
                         <span className="absolute right-2 top-2 text-[10px] text-slate-400 font-bold">seg</span>
@@ -339,9 +489,12 @@ export default function TrackJudgeView({
                       <div className="flex space-x-1">
                         <button
                           onClick={() => handleStatusChange(athlete.id, 'valid')}
-                          title="Válido"
+                          disabled={!isAdmin}
+                          title={isAdmin ? "Marcar Válido" : "Requiere iniciar sesión"}
                           className={`px-2 py-1 rounded-lg text-xs font-bold transition-all ${
-                            currentStatus === 'valid'
+                            !isAdmin
+                              ? 'opacity-60 cursor-not-allowed bg-slate-100 text-slate-500'
+                              : currentStatus === 'valid'
                               ? 'bg-emerald-500 text-white shadow-xs'
                               : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                           }`}
@@ -350,9 +503,12 @@ export default function TrackJudgeView({
                         </button>
                         <button
                           onClick={() => handleStatusChange(athlete.id, 'dns')}
-                          title="No se presentó (DNS)"
+                          disabled={!isAdmin}
+                          title={isAdmin ? "No se presentó (DNS)" : "Requiere iniciar sesión"}
                           className={`px-2 py-1 rounded-lg text-xs font-bold transition-all ${
-                            currentStatus === 'dns'
+                            !isAdmin
+                              ? 'opacity-60 cursor-not-allowed bg-slate-100 text-slate-500'
+                              : currentStatus === 'dns'
                               ? 'bg-amber-500 text-white shadow-xs'
                               : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                           }`}
@@ -361,9 +517,12 @@ export default function TrackJudgeView({
                         </button>
                         <button
                           onClick={() => handleStatusChange(athlete.id, 'dq')}
-                          title="Descalificado (DQ)"
+                          disabled={!isAdmin}
+                          title={isAdmin ? "Descalificado (DQ)" : "Requiere iniciar sesión"}
                           className={`px-2 py-1 rounded-lg text-xs font-bold transition-all ${
-                            currentStatus === 'dq'
+                            !isAdmin
+                              ? 'opacity-60 cursor-not-allowed bg-slate-100 text-slate-500'
+                              : currentStatus === 'dq'
                               ? 'bg-rose-500 text-white shadow-xs'
                               : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                           }`}
@@ -379,13 +538,24 @@ export default function TrackJudgeView({
           )}
 
           <div className="pt-3 flex justify-end">
-            <button
-              onClick={handleSaveHeat}
-              className="px-5 py-2.5 bg-rose-500 hover:bg-rose-600 text-white font-bold text-xs rounded-xl shadow-xs flex items-center space-x-2 transition-all"
-            >
-              <Send className="w-3.5 h-3.5" />
-              <span>Guardar Tiempos y Notificar a Mesa</span>
-            </button>
+            {isAdmin ? (
+              <button
+                onClick={handleSaveHeat}
+                className="px-5 py-2.5 bg-rose-500 hover:bg-rose-600 text-white font-bold text-xs rounded-xl shadow-xs flex items-center space-x-2 transition-all"
+              >
+                <Send className="w-3.5 h-3.5" />
+                <span>Guardar Tiempos y Notificar a Mesa</span>
+              </button>
+            ) : (
+              <button
+                onClick={onOpenAdminLogin}
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl border border-slate-300 flex items-center space-x-1.5 transition-colors shadow-2xs"
+                title="Desbloquear captura de tiempos oficiales"
+              >
+                <Lock className="w-3.5 h-3.5 text-amber-600" />
+                <span>Iniciar Sesión para Modificar Tiempos</span>
+              </button>
+            )}
           </div>
         </div>
 

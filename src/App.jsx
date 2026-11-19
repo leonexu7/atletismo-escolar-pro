@@ -255,6 +255,8 @@ export default function App() {
             results={state.results}
             onSaveTrackResult={handleSaveTrackResult}
             onOpenLiveResults={handleSelectEventForPodium}
+            isAdmin={isAdmin}
+            onOpenAdminLogin={() => setIsAdminLoginOpen(true)}
           />
         )}
 
@@ -266,6 +268,8 @@ export default function App() {
             results={state.results}
             onSaveFieldResult={handleSaveFieldResult}
             onOpenLiveResults={handleSelectEventForPodium}
+            isAdmin={isAdmin}
+            onOpenAdminLogin={() => setIsAdminLoginOpen(true)}
           />
         )}
 
