@@ -8,7 +8,9 @@ export const DEMO_SCHOOLS = [
     id: 'esc-1',
     name: 'Esc. Primaria Benito Juárez',
     shortName: 'Benito Juárez',
+    cct: '21EPR0101A',
     zone: 'Zona Escolar 04',
+    inspection: 'Inspección 12',
     coachName: 'Prof. Roberto González',
     phone: '55 1234 5678',
     color: '#b91c1c'
@@ -17,7 +19,9 @@ export const DEMO_SCHOOLS = [
     id: 'esc-2',
     name: 'Colegio José María Morelos',
     shortName: 'Col. Morelos',
+    cct: '21PPR0202B',
     zone: 'Zona Escolar 04',
+    inspection: 'Inspección 12',
     coachName: 'Profra. Marcela Mendoza',
     phone: '55 2345 6789',
     color: '#047857'
@@ -26,7 +30,9 @@ export const DEMO_SCHOOLS = [
     id: 'esc-3',
     name: 'Primaria Niños Héroes',
     shortName: 'Niños Héroes',
+    cct: '21DPR0303C',
     zone: 'Zona Escolar 08',
+    inspection: 'Inspección 14',
     coachName: 'Prof. Carlos Salgado',
     phone: '55 3456 7890',
     color: '#1d4ed8'
@@ -35,7 +41,9 @@ export const DEMO_SCHOOLS = [
     id: 'esc-4',
     name: 'Instituto Pedagógico Patria',
     shortName: 'Inst. Patria',
+    cct: '21PPR0404D',
     zone: 'Zona Escolar 08',
+    inspection: 'Inspección 14',
     coachName: 'Profra. Laura Domínguez',
     phone: '55 4567 8901',
     color: '#d97706'

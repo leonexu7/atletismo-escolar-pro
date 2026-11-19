@@ -5,6 +5,7 @@
 import { evaluateFieldAttempts, rankFieldEventCompetitors, rankTrackEventRunners } from '../src/utils/tieBreaker.js';
 import { formatTrackTime, parseTrackTime, formatFieldDistance, parseFieldDistance } from '../src/utils/timeFormatter.js';
 import { PARTICIPATION_LIMITS } from '../src/constants/categories.js';
+import { cleanCCT, cleanSchoolName, findExistingSchoolMatch } from '../src/utils/schoolNormalizer.js';
 
 console.log('🧪 Iniciando pruebas de Atletismo Escolar Pro...\n');
 
@@ -83,6 +84,26 @@ console.log('\n📌 Verificando Regla de Inscripciones (2 Individuales y 2 Equip
 assert(PARTICIPATION_LIMITS.MAX_INDIVIDUAL_EVENTS === 2, 'Límite de pruebas individuales debe ser 2');
 assert(PARTICIPATION_LIMITS.MAX_RELAY_EVENTS === 2, 'Límite de pruebas de equipo/relevos debe ser 2');
 assert(PARTICIPATION_LIMITS.MAX_TOTAL_EVENTS === 4, 'Límite total combinado de pruebas debe ser 4');
+
+// --- PRUEBA 6: Normalización y Anti-Duplicados de Escuelas (CCT y Nombres) ---
+console.log('\n📌 Verificando Normalización y Detección Anti-Duplicados de Escuelas:');
+assert(cleanCCT(' 21-epr 0101 A ') === '21EPR0101A', 'cleanCCT debe normalizar a mayúsculas sin espacios ni guiones');
+assert(
+  cleanSchoolName('Esc. Primaria Benito Juárez') === cleanSchoolName('PRIMARIA BENITO JUAREZ'),
+  'cleanSchoolName debe igualar "Esc. Primaria Benito Juárez" con "PRIMARIA BENITO JUAREZ"'
+);
+
+const existingSchools = [
+  { id: 'esc-1', name: 'Esc. Primaria Benito Juárez', cct: '21EPR0101A', zone: 'Zona Escolar 04', inspection: 'Inspección 12' }
+];
+
+const candidateWithCCT = { name: 'benito juarez', cct: '21epr0101a', zone: '04' };
+const match1 = findExistingSchoolMatch(existingSchools, candidateWithCCT);
+assert(match1.isMatch === true && match1.matchType === 'cct', 'Debe detectar duplicado por Clave CCT idéntica');
+
+const candidateWithoutCCT = { name: 'PRIMARIA BENITO JUAREZ', cct: '', zone: '04' };
+const match2 = findExistingSchoolMatch(existingSchools, candidateWithoutCCT);
+assert(match2.isMatch === true && match2.matchType === 'name', 'Debe detectar duplicado por nombre normalizado aunque cambien mayúsculas y acentos');
 
 console.log('\n----------------------------------------');
 if (failedTests === 0) {

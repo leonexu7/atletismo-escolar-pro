@@ -171,6 +171,23 @@ export default function App() {
     }));
   };
 
+  const handleSaveSchool = (schoolData) => {
+    setState(prev => {
+      const existingIdx = (prev.schools || []).findIndex(s => s.id === schoolData.id);
+      let updatedSchools;
+      if (existingIdx !== -1) {
+        updatedSchools = [...prev.schools];
+        updatedSchools[existingIdx] = { ...updatedSchools[existingIdx], ...schoolData };
+      } else {
+        updatedSchools = [...prev.schools, schoolData];
+      }
+      return {
+        ...prev,
+        schools: updatedSchools
+      };
+    });
+  };
+
   const handleSaveTournament = (updatedTournament, fullReplacement = null) => {
     if (fullReplacement) {
       setState(fullReplacement);
@@ -244,6 +261,7 @@ export default function App() {
             schools={state.schools}
             athletes={state.athletes}
             relays={state.relays}
+            onSaveSchool={handleSaveSchool}
             onRegisterAthlete={handleRegisterAthlete}
             onRegisterBatchAthletes={handleRegisterBatchAthletes}
             onUpdateAthlete={handleUpdateAthlete}

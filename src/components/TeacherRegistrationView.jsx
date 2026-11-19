@@ -22,12 +22,15 @@ import {
   Share2,
   UserCheck,
   MapPin,
-  Calendar
+  Calendar,
+  ArrowLeftRight,
+  Building2
 } from 'lucide-react';
 import { OFFICIAL_EVENTS, isTrackEvent, isFieldEvent } from '../constants/events';
 import { SCHOOL_CATEGORIES, PARTICIPATION_LIMITS } from '../constants/categories';
 import { downloadExcelRegistrationTemplate, parseExcelAthletesFile } from '../utils/excelHandler';
 import RelayBuilderModal from './RelayBuilderModal';
+import SchoolSelectorModal from './SchoolSelectorModal';
 
 export default function TeacherRegistrationView({
   tournament,
@@ -44,39 +47,41 @@ export default function TeacherRegistrationView({
   onOpenAdminLogin,
   onOpenControlDesk
 }) {
-  // Datos de la Escuela del Maestro (guardados en localStorage)
+  const [isSchoolModalOpen, setIsSchoolModalOpen] = useState(false);
+
+  // Datos de la Escuela del Maestro (guardados en localStorage como opción predeterminada)
   const [schoolInfo, setSchoolInfo] = useState(() => {
     try {
+      const savedId = localStorage.getItem('atletismo_saved_school_id');
+      if (savedId && Array.isArray(schools)) {
+        const found = schools.find(s => s.id === savedId);
+        if (found) return found;
+      }
       const saved = localStorage.getItem('atletismo_saved_school_info');
       if (saved) return JSON.parse(saved);
     } catch (_) {}
-    return {
+
+    return schools[0] || {
       id: 'esc-1',
       name: 'Esc. Primaria Benito Juárez',
+      shortName: 'Benito Juárez',
+      cct: '21EPR0101A',
       zone: 'Zona Escolar 04',
+      inspection: 'Inspección 12',
       coachName: 'Prof. Roberto González',
       phone: ''
     };
   });
 
-  const [isSchoolLocked, setIsSchoolLocked] = useState(() => {
-    return Boolean(localStorage.getItem('atletismo_saved_school_info'));
-  });
-
-  // Guardar escuela
-  const handleToggleSchoolLock = () => {
-    if (!isSchoolLocked) {
-      if (!schoolInfo.name.trim()) {
-        alert('Por favor escribe el nombre de tu escuela.');
-        return;
-      }
-      setIsSchoolLocked(true);
-      try {
-        localStorage.setItem('atletismo_saved_school_info', JSON.stringify(schoolInfo));
-      } catch (_) {}
-    } else {
-      setIsSchoolLocked(false);
-    }
+  // Guardar escuela predeterminada al seleccionarla o registrarla
+  const handleSelectSchool = (newSchool) => {
+    setSchoolInfo(newSchool);
+    try {
+      localStorage.setItem('atletismo_saved_school_id', newSchool.id);
+      localStorage.setItem('atletismo_saved_school_info', JSON.stringify(newSchool));
+    } catch (_) {}
+    setSuccessNotice(`¡Escuela "${newSchool.name}" establecida como tu opción predeterminada!`);
+    setTimeout(() => setSuccessNotice(''), 4500);
   };
 
   // Formulario individual para nuevo alumno
@@ -350,33 +355,53 @@ export default function TeacherRegistrationView({
         </div>
       </div>
 
-      {/* Tarjeta de la Escuela con Botón Integrado de Mesa de Control */}
+      {/* Tarjeta de la Escuela con Botón para Cambiar/Registrar y Mesa de Control */}
       <div className="bg-white border border-slate-200/90 rounded-2xl p-4 sm:p-5 shadow-xs">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <div className="flex items-center space-x-3.5">
-            <div className="w-11 h-11 rounded-2xl bg-rose-50 border border-rose-200 text-rose-600 flex items-center justify-center flex-shrink-0">
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+          <div className="flex items-start sm:items-center space-x-3.5">
+            <div className="w-12 h-12 rounded-2xl bg-rose-50 border border-rose-200 text-rose-600 flex items-center justify-center flex-shrink-0 shadow-2xs">
               <School className="w-6 h-6" />
             </div>
             <div>
-              <div className="flex items-center space-x-2">
+              <div className="flex flex-wrap items-center gap-1.5">
                 <span className="text-[10px] uppercase font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded-full border border-rose-200">
                   Cédula Escolar Oficial
                 </span>
-                <span className="text-xs text-slate-500">{schoolInfo.zone}</span>
+                {schoolInfo.cct && (
+                  <span className="text-[10px] font-mono font-bold bg-slate-900 text-amber-300 px-2 py-0.5 rounded-full border border-slate-700">
+                    CCT: {schoolInfo.cct}
+                  </span>
+                )}
+                <span className="text-xs text-slate-500 font-medium">• {schoolInfo.zone || 'Zona Escolar'}</span>
+                {schoolInfo.inspection && (
+                  <span className="text-xs text-slate-500 font-medium">• {schoolInfo.inspection}</span>
+                )}
               </div>
-              <h2 className="text-base sm:text-lg font-bold text-slate-900 mt-0.5">
+              <h2 className="text-base sm:text-lg font-extrabold text-slate-900 mt-0.5">
                 {schoolInfo.name}
               </h2>
-              <p className="text-xs text-slate-500">
-                Profesor(a): <strong className="text-slate-700">{schoolInfo.coachName || 'Sin asignar'}</strong>
+              <p className="text-xs text-slate-600 mt-0.5">
+                Profesor(a) a cargo: <strong className="text-slate-800">{schoolInfo.coachName || 'Sin asignar'}</strong>
               </p>
             </div>
           </div>
 
-          {/* Botones Integrados: Mesa de Control + Excel + Relevos */}
+          {/* Botones Integrados: Cambiar Escuela + Mesa de Control + Excel + Relevos */}
           <div className="flex flex-wrap items-center gap-2">
+            {/* BOTÓN CLAVE: CAMBIAR O REGISTRAR ESCUELA */}
+            <button
+              type="button"
+              onClick={() => setIsSchoolModalOpen(true)}
+              className="px-3.5 py-2 bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-300 rounded-xl text-xs font-bold flex items-center space-x-1.5 transition-colors shadow-2xs"
+              title="Cambiar a otra escuela o registrar una nueva institución"
+            >
+              <ArrowLeftRight className="w-3.5 h-3.5 text-rose-600" />
+              <span>Cambiar / Registrar Escuela</span>
+            </button>
+
             {/* BOTÓN PROMINENTE DE MESA DE CONTROL INTEGRADO */}
             <button
+              type="button"
               onClick={() => {
                 if (isAdmin) {
                   onOpenControlDesk();
@@ -926,6 +951,16 @@ export default function TeacherRegistrationView({
         availableAthletes={athletes}
         existingRelays={relays}
         onSaveRelay={onSaveRelay}
+      />
+
+      {/* Modal de Selección y Registro de Escuela con Anti-Duplicados */}
+      <SchoolSelectorModal
+        isOpen={isSchoolModalOpen}
+        onClose={() => setIsSchoolModalOpen(false)}
+        schools={schools}
+        currentSchool={schoolInfo}
+        onSelectSchool={handleSelectSchool}
+        onSaveSchool={onSaveSchool}
       />
     </div>
   );
