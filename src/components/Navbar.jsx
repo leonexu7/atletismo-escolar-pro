@@ -11,7 +11,8 @@ import {
   Unlock,
   LogOut,
   Calendar,
-  MapPin
+  MapPin,
+  BookOpen
 } from 'lucide-react';
 import runnerSilhouette from '../assets/runner_silhouette.png';
 import defaultBannerLogo from '../assets/puebla_sep_banner.jpg';
@@ -26,10 +27,12 @@ export default function Navbar({
   onOpenSettings,
   onOpenCloudModal,
   cloudSession,
-  readyAwardsCount = 0
+  readyAwardsCount = 0,
+  athletesCount = 0
 }) {
   const shouldShowInstitutionalHeader =
-    activeTab === 'registration' || (activeTab === 'control_desk' && tournament?.showLogoInControlDesk);
+    activeTab === 'registration' ||
+    ((activeTab === 'control_desk' || activeTab === 'athletes_roster') && tournament?.showLogoInControlDesk);
 
   const activeLogo = tournament?.customLogo || defaultBannerLogo;
 
@@ -39,6 +42,14 @@ export default function Navbar({
     { id: 'field_judge', label: 'Juez de Campo', shortLabel: 'Campo', icon: Ruler, requiresAdmin: false },
     { id: 'live_results', label: 'Podio y Resultados', shortLabel: 'Podio', icon: Trophy, requiresAdmin: false },
     {
+      id: 'athletes_roster',
+      label: 'Padrón General',
+      shortLabel: 'Padrón',
+      icon: BookOpen,
+      onlyAdmin: true,
+      badge: athletesCount > 0 ? `${athletesCount}` : null
+    },
+    {
       id: 'control_desk',
       label: 'Mesa de Control',
       shortLabel: 'Control',
@@ -47,6 +58,8 @@ export default function Navbar({
       badge: readyAwardsCount > 0 ? `${readyAwardsCount} listos` : null
     }
   ];
+
+  const visibleTabs = tabs.filter(tab => !tab.onlyAdmin || isAdmin);
 
   const handleTabClick = (tab) => {
     if (tab.requiresAdmin && !isAdmin) {
@@ -58,15 +71,19 @@ export default function Navbar({
 
   return (
     <header className="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-xs">
-      {/* 1. Logotipo Institucional Oficial como ENCABEZADO REAL (Arriba del título de Juegos Deportivos Escolares) */}
+      {/* 1. Logotipo Institucional Oficial como BANDA ENCABEZADO CONTINUA (Sin huecos en laptops) */}
       {shouldShowInstitutionalHeader && (
-        <div className="bg-white border-b border-slate-200/90 py-2 sm:py-2.5 px-3 sm:px-6 flex items-center justify-center transition-all">
-          <img
-            src={activeLogo}
-            alt="Gobierno del Estado de Puebla - Secretaría de Educación Pública"
-            className="h-9 sm:h-12 md:h-14 w-auto max-w-full object-contain"
-          />
-        </div>
+        <div
+          className="w-full h-11 sm:h-14 md:h-16 bg-white border-b border-slate-200/90 shadow-2xs overflow-hidden"
+          style={{
+            backgroundImage: `url(${activeLogo})`,
+            backgroundRepeat: 'repeat-x',
+            backgroundPosition: 'left center',
+            backgroundSize: 'auto 100%'
+          }}
+          title="Gobierno del Estado de Puebla - Secretaría de Educación Pública"
+          role="banner"
+        />
       )}
 
       {/* 2. Barra con el título oficial de los Juegos Escolares Deportivos */}
@@ -140,16 +157,16 @@ export default function Navbar({
       {/* Barra de Navegación Principal en Blanco y Pastel */}
       <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-14">
-          {/* Logotipo Oficial con Silueta de Corredor Formal */}
+          {/* Logotipo Oficial con Silueta de Corredor Formal (Esquinas redondeadas sin huecos) */}
           <div
             className="flex items-center space-x-2.5 cursor-pointer flex-shrink-0"
             onClick={() => onSelectTab('registration')}
           >
-            <div className="w-9 h-9 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center p-1.5 shadow-2xs hover:bg-slate-200/80 transition-colors">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl overflow-hidden border border-slate-200/90 bg-white flex items-center justify-center shadow-2xs hover:border-slate-300 transition-all flex-shrink-0">
               <img
                 src={runnerSilhouette}
-                alt="Silueta de Corredor Formal"
-                className="w-full h-full object-contain"
+                alt="Silueta de Corredor Oficial"
+                className="w-full h-full object-cover rounded-xl"
               />
             </div>
             <div>
@@ -164,7 +181,7 @@ export default function Navbar({
 
           {/* Pestañas de Navegación con Scroll Horizontal Suave en Móviles */}
           <nav className="flex space-x-1 overflow-x-auto no-scrollbar py-1">
-            {tabs.map((tab) => {
+            {visibleTabs.map((tab) => {
               const Icon = tab.icon;
               const isActive = activeTab === tab.id;
               const isLocked = tab.requiresAdmin && !isAdmin;

@@ -9,6 +9,7 @@
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { formatTrackTime, formatFieldDistance } from './timeFormatter';
+import { OFFICIAL_EVENTS } from '../constants/events';
 
 /**
  * Genera la Planilla Oficial de Jueces de Pista en orientación Horizontal
@@ -296,4 +297,74 @@ export function generateAwardsDiplomasPDF(winners = [], event = {}, tournamentIn
   });
 
   doc.save(`Diplomas_${event.shortName || 'Premiacion'}.pdf`);
+}
+
+/**
+ * Genera la Planilla Oficial del Padrón General de Atletas en PDF
+ */
+export function generateMasterAthletesRosterPDF(athletes = [], schools = [], tournamentInfo = {}) {
+  const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'letter' });
+  const pageWidth = doc.internal.pageSize.getWidth();
+
+  // Encabezado institucional
+  doc.setFillColor(15, 23, 42); // slate-900
+  doc.rect(0, 0, pageWidth, 24, 'F');
+
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(13);
+  doc.setFont('helvetica', 'bold');
+  doc.text(String(tournamentInfo.name || 'JUEGOS DEPORTIVOS ESCOLARES DE ATLETISMO').toUpperCase(), 14, 10);
+
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(226, 232, 240);
+  doc.text(`PADRÓN GENERAL OFICIAL DE COMPETIDORES INSCRITOS  |  TOTAL: ${athletes.length} ATLETAS`, 14, 18);
+
+  // Metadatos
+  doc.setTextColor(30, 41, 59);
+  doc.setFontSize(8.5);
+  doc.text(`Sede: ${tournamentInfo.venue || 'Estadio Escolar'}`, 14, 30);
+  doc.text(`Fecha: ${tournamentInfo.date || new Date().toLocaleDateString('es-MX')}`, 120, 30);
+  doc.text(`Organizador: ${tournamentInfo.organizer || 'Comité Organizador'}`, 200, 30);
+
+  const tableBody = athletes.map((ath, idx) => {
+    const school = schools.find(s => s.id === ath.schoolId);
+    const eventNames = (ath.eventIds || []).map(eId => {
+      const ev = OFFICIAL_EVENTS.find(e => e.id === eId);
+      return ev ? ev.name : eId;
+    }).join(' • ');
+
+    return [
+      idx + 1,
+      ath.bibNumber ? `#${ath.bibNumber}` : 'S/N',
+      ath.fullName,
+      ath.gender === 'F' ? 'Fem' : 'Var',
+      ath.schoolGrade ? `${ath.schoolGrade}°` : '-',
+      school?.shortName || school?.name || ath.schoolName || 'Sin Escuela',
+      eventNames || 'Sin pruebas',
+      '' // Cotejo / Firma
+    ];
+  });
+
+  autoTable(doc, {
+    startY: 34,
+    head: [['#', 'Dorsal', 'Nombre Completo del Atleta', 'Rama', 'Grado', 'Escuela Primaria', 'Pruebas Inscritas', 'Cotejo']],
+    body: tableBody,
+    theme: 'grid',
+    styles: { fontSize: 8, cellPadding: 2, textColor: [15, 23, 42] },
+    headStyles: { fillColor: [30, 41, 59], textColor: [255, 255, 255], fontStyle: 'bold' },
+    alternateRowStyles: { fillColor: [248, 250, 252] },
+    columnStyles: {
+      0: { cellWidth: 10, halign: 'center' },
+      1: { cellWidth: 16, halign: 'center', fontStyle: 'bold' },
+      2: { cellWidth: 55, fontStyle: 'bold' },
+      3: { cellWidth: 14, halign: 'center' },
+      4: { cellWidth: 14, halign: 'center' },
+      5: { cellWidth: 45 },
+      6: { cellWidth: 70 },
+      7: { cellWidth: 20 }
+    }
+  });
+
+  doc.save(`Padron_Oficial_Atletas_${Date.now()}.pdf`);
 }

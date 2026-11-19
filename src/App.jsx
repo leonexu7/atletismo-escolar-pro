@@ -5,6 +5,7 @@ import TrackJudgeView from './components/TrackJudgeView';
 import FieldJudgeView from './components/FieldJudgeView';
 import ControlDeskView from './components/ControlDeskView';
 import LiveResultsView from './components/LiveResultsView';
+import AthletesRosterView from './components/AthletesRosterView';
 import AdminLoginModal from './components/AdminLoginModal';
 import TournamentSettingsModal from './components/TournamentSettingsModal';
 import CloudSyncModal from './components/CloudSyncModal';
@@ -207,10 +208,16 @@ export default function App() {
 
   const handleAdminLogout = () => {
     setIsAdmin(false);
-    if (activeTab === 'control_desk') {
+    if (activeTab === 'control_desk' || activeTab === 'athletes_roster') {
       setActiveTab('registration');
     }
   };
+
+  useEffect(() => {
+    if (activeTab === 'athletes_roster' && !isAdmin) {
+      setActiveTab('registration');
+    }
+  }, [activeTab, isAdmin]);
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col antialiased selection:bg-rose-500 selection:text-white">
@@ -226,6 +233,7 @@ export default function App() {
         onOpenCloudModal={() => setIsCloudModalOpen(true)}
         cloudSession={state.cloudSession}
         readyAwardsCount={readyAwardsCount}
+        athletesCount={state.athletes.length}
       />
 
       {/* Contenido Principal */}
@@ -270,6 +278,16 @@ export default function App() {
             onOpenLiveResults={handleSelectEventForPodium}
             isAdmin={isAdmin}
             onOpenAdminLogin={() => setIsAdminLoginOpen(true)}
+          />
+        )}
+
+        {activeTab === 'athletes_roster' && (
+          <AthletesRosterView
+            tournament={state.tournament}
+            athletes={state.athletes}
+            schools={state.schools}
+            onUpdateAthlete={handleUpdateAthlete}
+            onDeleteAthlete={handleDeleteAthlete}
           />
         )}
 

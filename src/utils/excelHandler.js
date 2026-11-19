@@ -82,6 +82,78 @@ export function downloadExcelRegistrationTemplate() {
   XLSX.writeFile(wb, 'Plantilla_Inscripcion_Atletismo_Primaria.xlsx');
 }
 
+/**
+ * Exporta el Padrón General Maestro de Atletas a Excel con todos sus datos y pruebas
+ */
+export function exportMasterAthletesRosterToExcel(athletes = [], schools = [], tournament = {}) {
+  const wb = XLSX.utils.book_new();
+
+  const titleRows = [
+    [String(tournament?.name || 'JUEGOS DEPORTIVOS ESCOLARES DE ATLETISMO').toUpperCase()],
+    [`PADRÓN GENERAL OFICIAL DE ATLETAS INSCRITOS - SEDE: ${tournament?.venue || 'Sede Oficial'}`],
+    [`Fecha de Generación: ${new Date().toLocaleDateString('es-MX')} | Total de Atletas: ${athletes.length}`],
+    ['']
+  ];
+
+  const headers = [
+    '#',
+    'Dorsal',
+    'Nombre Completo del Alumno',
+    'Rama',
+    'Grado Escolar',
+    'Fecha de Nacimiento',
+    'CURP',
+    'Escuela Primaria',
+    'Zona Escolar',
+    'Profesor / Entrenador',
+    'Pruebas Asignadas',
+    'Total Pruebas'
+  ];
+
+  const dataRows = athletes.map((ath, idx) => {
+    const school = schools.find(s => s.id === ath.schoolId);
+    const eventNames = (ath.eventIds || []).map(eId => {
+      const ev = OFFICIAL_EVENTS.find(e => e.id === eId);
+      return ev ? ev.name : eId;
+    }).join(', ');
+
+    return [
+      idx + 1,
+      ath.bibNumber || 'S/N',
+      ath.fullName,
+      ath.gender === 'F' ? 'Femenil' : 'Varonil',
+      ath.schoolGrade ? `${ath.schoolGrade}°` : '-',
+      ath.birthDate || '-',
+      ath.curp || '-',
+      school?.name || ath.schoolName || 'Sin Escuela',
+      school?.zone || '-',
+      school?.coachName || '-',
+      eventNames || 'Sin pruebas',
+      (ath.eventIds || []).length
+    ];
+  });
+
+  const ws = XLSX.utils.aoa_to_sheet([...titleRows, headers, ...dataRows]);
+
+  ws['!cols'] = [
+    { wch: 6 },  // #
+    { wch: 10 }, // Dorsal
+    { wch: 32 }, // Nombre
+    { wch: 10 }, // Rama
+    { wch: 14 }, // Grado
+    { wch: 20 }, // Fecha Nac
+    { wch: 22 }, // CURP
+    { wch: 30 }, // Escuela
+    { wch: 16 }, // Zona
+    { wch: 24 }, // Entrenador
+    { wch: 45 }, // Pruebas
+    { wch: 14 }  // Total
+  ];
+
+  XLSX.utils.book_append_sheet(wb, ws, 'Padrón General');
+  XLSX.writeFile(wb, `Padron_General_Atletas_${tournament?.name ? String(tournament.name).replace(/\s+/g, '_') : 'Atletismo'}.xlsx`);
+}
+
 export function parseExcelAthletesFile(file, categoryGroupingMode = 'unified') {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
