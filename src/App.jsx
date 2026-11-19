@@ -232,6 +232,7 @@ export default function App() {
       <main className="flex-1 pb-10">
         {activeTab === 'registration' && (
           <TeacherRegistrationView
+            tournament={state.tournament}
             schools={state.schools}
             athletes={state.athletes}
             relays={state.relays}

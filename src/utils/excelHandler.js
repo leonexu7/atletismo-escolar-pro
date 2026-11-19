@@ -82,7 +82,7 @@ export function downloadExcelRegistrationTemplate() {
   XLSX.writeFile(wb, 'Plantilla_Inscripcion_Atletismo_Primaria.xlsx');
 }
 
-export function parseExcelAthletesFile(file) {
+export function parseExcelAthletesFile(file, categoryGroupingMode = 'unified') {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
 
@@ -168,7 +168,9 @@ export function parseExcelAthletesFile(file) {
             gender,
             schoolGrade: grade,
             birthDate,
-            categoryId: (grade === '3' || grade === '4') ? 'infantil_menor' : 'infantil_mayor',
+            categoryId: categoryGroupingMode === 'unified'
+              ? 'primaria_abierta'
+              : ((grade === '3' || grade === '4') ? 'infantil_menor' : 'infantil_mayor'),
             eventIds: Array.from(new Set(eventIds))
           });
         });

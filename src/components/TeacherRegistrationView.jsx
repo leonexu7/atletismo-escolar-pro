@@ -20,7 +20,9 @@ import {
   Unlock,
   MessageSquare,
   Share2,
-  UserCheck
+  UserCheck,
+  MapPin,
+  Calendar
 } from 'lucide-react';
 import { OFFICIAL_EVENTS, isTrackEvent, isFieldEvent } from '../constants/events';
 import { SCHOOL_CATEGORIES, PARTICIPATION_LIMITS } from '../constants/categories';
@@ -28,6 +30,7 @@ import { downloadExcelRegistrationTemplate, parseExcelAthletesFile } from '../ut
 import RelayBuilderModal from './RelayBuilderModal';
 
 export default function TeacherRegistrationView({
+  tournament,
   schools = [],
   athletes = [],
   relays = [],
@@ -140,9 +143,10 @@ export default function TeacherRegistrationView({
       return;
     }
 
-    const calculatedCategory = (athleteForm.schoolGrade === '3' || athleteForm.schoolGrade === '4')
-      ? 'infantil_menor'
-      : 'infantil_mayor';
+    const isUnified = (tournament?.categoryGroupingMode || 'unified') === 'unified';
+    const calculatedCategory = isUnified
+      ? 'primaria_abierta'
+      : (athleteForm.schoolGrade === '3' || athleteForm.schoolGrade === '4' ? 'infantil_menor' : 'infantil_mayor');
 
     const assignedBib = athleteForm.bibNumber
       ? parseInt(athleteForm.bibNumber, 10)
@@ -185,9 +189,10 @@ export default function TeacherRegistrationView({
       return;
     }
 
-    const calculatedCategory = (editingAthlete.schoolGrade === '3' || editingAthlete.schoolGrade === '4')
-      ? 'infantil_menor'
-      : 'infantil_mayor';
+    const isUnified = (tournament?.categoryGroupingMode || 'unified') === 'unified';
+    const calculatedCategory = isUnified
+      ? 'primaria_abierta'
+      : (editingAthlete.schoolGrade === '3' || editingAthlete.schoolGrade === '4' ? 'infantil_menor' : 'infantil_mayor');
 
     const updated = {
       ...editingAthlete,
@@ -217,7 +222,7 @@ export default function TeacherRegistrationView({
 
     setExcelLoading(true);
     try {
-      const parsedList = await parseExcelAthletesFile(file);
+      const parsedList = await parseExcelAthletesFile(file, tournament?.categoryGroupingMode);
       if (parsedList.length === 0) {
         alert('No se detectaron alumnos válidos en la hoja Atletas.');
         return;
@@ -282,6 +287,56 @@ export default function TeacherRegistrationView({
           <span>{successNotice}</span>
         </div>
       )}
+
+      {/* BANNER OFICIAL: SEDE, UBICACIÓN DEL EVENTO Y MODALIDAD */}
+      <div className="bg-white border border-slate-200/90 rounded-2xl p-4 sm:p-5 shadow-2xs">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+          <div className="flex items-start sm:items-center space-x-3.5">
+            <div className="w-10 h-10 rounded-xl bg-amber-50 border border-amber-200 text-amber-600 flex items-center justify-center shrink-0">
+              <MapPin className="w-5 h-5 text-amber-600" />
+            </div>
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-[10px] uppercase font-bold text-amber-800 bg-amber-50 px-2.5 py-0.5 rounded-full border border-amber-200">
+                  Sede Oficial del Evento
+                </span>
+                {tournament?.date && (
+                  <span className="text-xs text-slate-500 flex items-center space-x-1">
+                    <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                    <span>Fecha: <strong className="text-slate-800">{tournament.date}</strong></span>
+                  </span>
+                )}
+              </div>
+              <h2 className="text-sm sm:text-base font-bold text-slate-900 mt-0.5">
+                {tournament?.venue || 'Pista de Atletismo Municipal y Estadio Escolar'}
+              </h2>
+              {tournament?.venueAddress && (
+                <p className="text-xs text-slate-600 flex items-center space-x-1 mt-0.5">
+                  <span className="text-rose-500 font-bold">📍 Dirección:</span>
+                  <span className="font-medium text-slate-700">{tournament.venueAddress}</span>
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* Indicador de Categoría Configurada */}
+          <div className="bg-slate-50 border border-slate-200/80 rounded-xl px-3.5 py-2 md:text-right shrink-0">
+            <span className="text-[10px] uppercase font-bold text-slate-500 block">
+              Modalidad de Agrupación
+            </span>
+            <span className="text-xs font-extrabold text-slate-900 block mt-0.5">
+              {(tournament?.categoryGroupingMode || 'unified') === 'unified'
+                ? '🤝 Categoría Única (Solo Varonil / Femenil)'
+                : '📊 Subdividido por Grados (3°-4° y 5°-6°)'}
+            </span>
+            <span className="text-[11px] text-slate-500">
+              {(tournament?.categoryGroupingMode || 'unified') === 'unified'
+                ? 'Compiten juntos alumnos de todas las edades'
+                : 'Competencias separadas por grado escolar'}
+            </span>
+          </div>
+        </div>
+      </div>
 
       {/* Tarjeta de la Escuela con Botón Integrado de Mesa de Control */}
       <div className="bg-white border border-slate-200/90 rounded-2xl p-4 sm:p-5 shadow-xs">
@@ -421,10 +476,23 @@ export default function TeacherRegistrationView({
                   onChange={(e) => setAthleteForm(prev => ({ ...prev, schoolGrade: e.target.value }))}
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs text-slate-900 focus:bg-white focus:ring-2 focus:ring-rose-400 outline-none"
                 >
-                  <option value="3">3º Primaria (Infantil Menor)</option>
-                  <option value="4">4º Primaria (Infantil Menor)</option>
-                  <option value="5">5º Primaria (Infantil Mayor)</option>
-                  <option value="6">6º Primaria (Infantil Mayor)</option>
+                  {(tournament?.categoryGroupingMode || 'unified') === 'unified' ? (
+                    <>
+                      <option value="1">1º Primaria</option>
+                      <option value="2">2º Primaria</option>
+                      <option value="3">3º Primaria</option>
+                      <option value="4">4º Primaria</option>
+                      <option value="5">5º Primaria</option>
+                      <option value="6">6º Primaria</option>
+                    </>
+                  ) : (
+                    <>
+                      <option value="3">3º Primaria (Infantil Menor)</option>
+                      <option value="4">4º Primaria (Infantil Menor)</option>
+                      <option value="5">5º Primaria (Infantil Mayor)</option>
+                      <option value="6">6º Primaria (Infantil Mayor)</option>
+                    </>
+                  )}
                 </select>
               </div>
             </div>
@@ -578,7 +646,11 @@ export default function TeacherRegistrationView({
 
                       <div className="text-[11px] text-slate-500 flex flex-wrap items-center gap-x-3 gap-y-0.5 pl-7">
                         <span>Grado: <strong className="text-slate-700">{ath.schoolGrade}º Primaria</strong></span>
-                        <span>Categoría: <strong className="text-slate-700">{ath.categoryId === 'infantil_menor' ? 'Inf. Menor (3°-4°)' : 'Inf. Mayor (5°-6°)'}</strong></span>
+                        <span>Categoría: <strong className="text-slate-700">
+                          {(tournament?.categoryGroupingMode || 'unified') === 'unified'
+                            ? `Primaria Única (${ath.gender === 'F' ? 'Femenil' : 'Varonil'})`
+                            : (ath.categoryId === 'infantil_menor' ? 'Inf. Menor (3°-4°)' : 'Inf. Mayor (5°-6°)')}
+                        </strong></span>
                         {ath.birthDate && <span>Nac: <strong>{ath.birthDate}</strong></span>}
                       </div>
 
@@ -713,10 +785,23 @@ export default function TeacherRegistrationView({
                     onChange={(e) => setEditingAthlete({ ...editingAthlete, schoolGrade: e.target.value })}
                     className="w-full px-2.5 py-1.5 border border-slate-300 rounded-xl bg-white text-xs outline-none focus:ring-2 focus:ring-rose-400"
                   >
-                    <option value="3">3º Primaria</option>
-                    <option value="4">4º Primaria</option>
-                    <option value="5">5º Primaria</option>
-                    <option value="6">6º Primaria</option>
+                    {(tournament?.categoryGroupingMode || 'unified') === 'unified' ? (
+                      <>
+                        <option value="1">1º Primaria</option>
+                        <option value="2">2º Primaria</option>
+                        <option value="3">3º Primaria</option>
+                        <option value="4">4º Primaria</option>
+                        <option value="5">5º Primaria</option>
+                        <option value="6">6º Primaria</option>
+                      </>
+                    ) : (
+                      <>
+                        <option value="3">3º Primaria (Infantil Menor)</option>
+                        <option value="4">4º Primaria (Infantil Menor)</option>
+                        <option value="5">5º Primaria (Infantil Mayor)</option>
+                        <option value="6">6º Primaria (Infantil Mayor)</option>
+                      </>
+                    )}
                   </select>
                 </div>
               </div>

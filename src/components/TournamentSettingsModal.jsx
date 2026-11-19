@@ -68,11 +68,12 @@ export default function TournamentSettingsModal({
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Sede / Pista:</label>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Nombre de la Sede / Pista:</label>
               <input
                 type="text"
+                placeholder="Ej. Estadio Olímpico Municipal"
                 value={formData.venue || ''}
                 onChange={(e) => handleChange('venue', e.target.value)}
                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 focus:bg-white focus:ring-2 focus:ring-rose-400 outline-none"
@@ -86,6 +87,70 @@ export default function TournamentSettingsModal({
                 onChange={(e) => handleChange('date', e.target.value)}
                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 focus:bg-white focus:ring-2 focus:ring-rose-400 outline-none"
               />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 mb-1">
+              📍 Ubicación / Dirección del Evento (Aparecerá en el portal de inscripción):
+            </label>
+            <input
+              type="text"
+              placeholder="Ej. Av. Insurgentes Sur #450, Unidad Deportiva Benito Juárez"
+              value={formData.venueAddress || ''}
+              onChange={(e) => handleChange('venueAddress', e.target.value)}
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 focus:bg-white focus:ring-2 focus:ring-rose-400 outline-none"
+            />
+          </div>
+
+          {/* Agrupación de Categorías (Requerimiento Usuario) */}
+          <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200 space-y-2.5">
+            <label className="block text-xs font-bold text-slate-800">
+              Modalidad de División de Categorías:
+            </label>
+            
+            <div className="space-y-2">
+              <label className={`flex items-start space-x-2.5 p-2.5 rounded-xl border cursor-pointer transition-all ${
+                (formData.categoryGroupingMode || 'unified') === 'unified'
+                  ? 'bg-rose-50 border-rose-300 text-rose-950 shadow-2xs'
+                  : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+              }`}>
+                <input
+                  type="radio"
+                  name="categoryGroupingMode"
+                  value="unified"
+                  checked={(formData.categoryGroupingMode || 'unified') === 'unified'}
+                  onChange={() => handleChange('categoryGroupingMode', 'unified')}
+                  className="mt-0.5 text-rose-600 focus:ring-rose-400"
+                />
+                <div className="text-xs">
+                  <strong className="block font-bold">Categoría Única Primaria (Juntar a todos por Rama)</strong>
+                  <span className="text-[11px] text-slate-500 block mt-0.5">
+                    No separa por edades ni grados (uno de 8 y uno de 11 compiten juntos). Solo se divide en Varonil y Femenil.
+                  </span>
+                </div>
+              </label>
+
+              <label className={`flex items-start space-x-2.5 p-2.5 rounded-xl border cursor-pointer transition-all ${
+                formData.categoryGroupingMode === 'by_grades'
+                  ? 'bg-rose-50 border-rose-300 text-rose-950 shadow-2xs'
+                  : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+              }`}>
+                <input
+                  type="radio"
+                  name="categoryGroupingMode"
+                  value="by_grades"
+                  checked={formData.categoryGroupingMode === 'by_grades'}
+                  onChange={() => handleChange('categoryGroupingMode', 'by_grades')}
+                  className="mt-0.5 text-rose-600 focus:ring-rose-400"
+                />
+                <div className="text-xs">
+                  <strong className="block font-bold">Dividir por Grados / Edades (Infantil Menor y Mayor)</strong>
+                  <span className="text-[11px] text-slate-500 block mt-0.5">
+                    Separa las pruebas en Infantil Menor (3°-4° grado / 8-9 años) e Infantil Mayor (5°-6° grado / 10-11 años).
+                  </span>
+                </div>
+              </label>
             </div>
           </div>
 

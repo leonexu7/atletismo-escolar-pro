@@ -10,12 +10,14 @@ export const DEFAULT_TOURNAMENT_INFO = {
   name: 'Juegos Deportivos Escolares de Atletismo Primaria 2026',
   edition: 'Etapa de Zona y Conducción Escolar',
   venue: 'Pista de Atletismo Municipal y Estadio Escolar',
+  venueAddress: 'Av. Insurgentes Sur #450, Unidad Deportiva Municipal',
   date: '2026-11-20',
   lanesCount: 6,
   fieldAttemptsCount: 3,
   adminPin: 'atletismo2026',
   organizer: 'Supervisión de Educación Física Escolar',
-  activeCategory: 'infantil_mayor'
+  activeCategory: 'primaria_abierta',
+  categoryGroupingMode: 'unified' // 'unified' = Categoría Única (Solo Varonil y Femenil sin separar por edades) | 'by_grades' = Dividir por Grados (3°-4° y 5°-6°)
 };
 
 export function loadTournamentState() {
