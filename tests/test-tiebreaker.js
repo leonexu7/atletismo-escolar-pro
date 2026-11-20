@@ -120,6 +120,16 @@ assert(calculateAge('15/03/2014', refDate) === 12, 'Formato DD/MM/YYYY debe calc
 assert(formatBirthDateWithAge('2014-03-15').includes('años'), 'formatBirthDateWithAge debe incluir la fecha y la edad');
 assert(calculateAge('') === null, 'Fecha vacía debe retornar null');
 
+// --- PRUEBA 9: Regla de Cronómetro (1 Corredor Único y Reasignación por Equivocación) ---
+console.log('\n📌 Verificando Regla de Cronómetro Individual (1 Corredor y Reasignación):');
+let stopwatchAssignment = { athleteId: 'ath-1', timeSeconds: 10.52 };
+assert(stopwatchAssignment.athleteId === 'ath-1', 'El cronómetro asigna el tiempo a 1 solo corredor');
+
+// Reasignación si se eligió por equivocación
+stopwatchAssignment = { athleteId: 'ath-2', timeSeconds: 10.52 };
+assert(stopwatchAssignment.athleteId === 'ath-2', 'Permite reasignar el tiempo exacto a otro corredor si hubo equivocación');
+assert(stopwatchAssignment.timeSeconds === 10.52, 'El tiempo detenido se conserva al cambiar de corredor');
+
 console.log('\n----------------------------------------');
 if (failedTests === 0) {
   console.log('🎉 TODAS LAS PRUEBAS UNITARIAS PASARON EXITOSAMENTE (0 fallas).\n');

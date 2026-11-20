@@ -39,6 +39,7 @@ export default function TrackJudgeView({
   const [selectedGender, setSelectedGender] = useState('M');
   const [selectedHeatIndex, setSelectedHeatIndex] = useState(0);
   const [isStopwatchOpen, setIsStopwatchOpen] = useState(false);
+  const [stopwatchTargetAthleteId, setStopwatchTargetAthleteId] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
 
   const activeEvent = trackEvents.find(e => e.id === selectedEventId) || trackEvents[0];
@@ -180,6 +181,18 @@ export default function TrackJudgeView({
 
     onSaveTrackResult(activeEvent.id, updatedEntries);
     alert('¡Tiempos guardados y sincronizados con la Mesa de Control!');
+  };
+
+  const handleApplySingleStopwatchTime = ({ athleteId, timeSeconds }) => {
+    if (!isAdmin) {
+      if (onOpenAdminLogin) onOpenAdminLogin();
+      return;
+    }
+    if (!athleteId || timeSeconds === undefined || timeSeconds === null) return;
+    setLocalTimes(prev => ({
+      ...prev,
+      [athleteId]: timeSeconds
+    }));
   };
 
   const handleApplyStopwatchSplits = (splits) => {
@@ -399,9 +412,10 @@ export default function TrackJudgeView({
                 if (onOpenAdminLogin) onOpenAdminLogin();
                 return;
               }
+              setStopwatchTargetAthleteId(null);
               setIsStopwatchOpen(true);
             }}
-            className="px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded-xl text-xs font-bold flex items-center space-x-1.5 transition-colors"
+            className="px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded-xl text-xs font-bold flex items-center space-x-1.5 transition-colors shadow-2xs"
           >
             <Clock className="w-3.5 h-3.5" />
             <span>{isAdmin ? 'Cronómetro' : 'Cronómetro (Bloqueado)'}</span>
@@ -468,7 +482,25 @@ export default function TrackJudgeView({
                     </div>
 
                     <div className="flex items-center space-x-2 self-end sm:self-auto">
-                      <div className="relative">
+                      {/* Botón para cronometrar a este corredor específico */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (!isAdmin) {
+                            if (onOpenAdminLogin) onOpenAdminLogin();
+                            return;
+                          }
+                          setStopwatchTargetAthleteId(athlete.id);
+                          setIsStopwatchOpen(true);
+                        }}
+                        className="px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded-xl text-xs font-bold flex items-center space-x-1 transition-colors shadow-2xs cursor-pointer"
+                        title={`Abrir cronómetro individual para ${athlete.fullName}`}
+                      >
+                        <Clock className="w-3.5 h-3.5" />
+                        <span className="hidden sm:inline">Cronometrar</span>
+                      </button>
+
+                      <div className="relative flex items-center">
                         <input
                           type="text"
                           value={currentTime}
@@ -483,8 +515,20 @@ export default function TrackJudgeView({
                               : 'bg-slate-100 border-slate-200 text-slate-400 line-through'
                           }`}
                         />
-                        <span className="absolute right-2 top-2 text-[10px] text-slate-400 font-bold">seg</span>
+                        <span className="absolute right-2 top-2 text-[10px] text-slate-400 font-bold pointer-events-none">seg</span>
                       </div>
+
+                      {/* Botón para borrar tiempo por error / equivocación */}
+                      {isAdmin && currentTime && (
+                        <button
+                          type="button"
+                          onClick={() => handleTimeChange(athlete.id, '')}
+                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 border border-slate-200 rounded-xl transition-colors cursor-pointer"
+                          title="Borrar tiempo de este competidor (en caso de equivocación)"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      )}
 
                       <div className="flex space-x-1">
                         <button
@@ -621,9 +665,18 @@ export default function TrackJudgeView({
 
       <DigitalStopwatchModal
         isOpen={isStopwatchOpen}
-        onClose={() => setIsStopwatchOpen(false)}
+        onClose={() => {
+          setIsStopwatchOpen(false);
+          setStopwatchTargetAthleteId(null);
+        }}
         lanes={activeHeat.lanes || []}
+        allAthletes={eligibleAthletes}
+        initialAthleteId={stopwatchTargetAthleteId}
+        onApplySingleTime={handleApplySingleStopwatchTime}
         onApplyTimes={handleApplyStopwatchSplits}
+        isAdmin={isAdmin}
+        onOpenAdminLogin={onOpenAdminLogin}
+        activeHeatName={activeHeat.name || 'Serie 1'}
       />
     </div>
   );
