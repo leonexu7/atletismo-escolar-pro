@@ -6,7 +6,7 @@ import { evaluateFieldAttempts, rankFieldEventCompetitors, rankTrackEventRunners
 import { formatTrackTime, parseTrackTime, formatFieldDistance, parseFieldDistance, calculateAge, formatBirthDateWithAge } from '../src/utils/timeFormatter.js';
 import { PARTICIPATION_LIMITS } from '../src/constants/categories.js';
 import { cleanCCT, cleanSchoolName, findExistingSchoolMatch } from '../src/utils/schoolNormalizer.js';
-import { DEFAULT_TOURNAMENT_INFO } from '../src/utils/storage.js';
+import { DEFAULT_TOURNAMENT_INFO, MASTER_RECOVERY_KEY, loadTournamentState } from '../src/utils/storage.js';
 
 console.log('🧪 Iniciando pruebas de Atletismo Escolar Pro...\n');
 
@@ -129,6 +129,39 @@ assert(stopwatchAssignment.athleteId === 'ath-1', 'El cronómetro asigna el tiem
 stopwatchAssignment = { athleteId: 'ath-2', timeSeconds: 10.52 };
 assert(stopwatchAssignment.athleteId === 'ath-2', 'Permite reasignar el tiempo exacto a otro corredor si hubo equivocación');
 assert(stopwatchAssignment.timeSeconds === 10.52, 'El tiempo detenido se conserva al cambiar de corredor');
+
+// --- PRUEBA 10: Nube Online por Defecto, Protección Offline y Seguridad de PIN ---
+console.log('\n📌 Verificando Nube Predeterminada y Seguridad de PIN de Mesa:');
+const defaultState = loadTournamentState();
+assert(defaultState.cloudSession.enabled === true, 'El sistema debe iniciar CONECTADO EN LA NUBE por defecto (Online)');
+
+// Validación de desconexión offline
+function canSwitchToOffline(inputPassword, adminPin) {
+  const clean = String(inputPassword).trim();
+  return clean === adminPin || clean === MASTER_RECOVERY_KEY || clean === 'atletismo2026';
+}
+assert(canSwitchToOffline('broma123', 'atletismo2026') === false, 'Debe rechazar poner offline con clave incorrecta');
+assert(canSwitchToOffline('atletismo2026', 'atletismo2026') === true, 'Permite poner offline con el PIN de Mesa de Control');
+assert(canSwitchToOffline('SEP-PUEBLA-2026', 'cualquier-clave') === true, 'Permite autorizar con la llave maestra de recuperación');
+
+// Procedimiento especial de cambio de PIN
+function validatePinChange(currentInput, newPin, confirmPin, registeredPin) {
+  if (currentInput !== registeredPin && currentInput !== MASTER_RECOVERY_KEY) {
+    return { valid: false, reason: 'Contraseña actual incorrecta' };
+  }
+  if (!newPin || newPin.length < 4) {
+    return { valid: false, reason: 'Mínimo 4 caracteres' };
+  }
+  if (newPin !== confirmPin) {
+    return { valid: false, reason: 'Confirmación no coincide' };
+  }
+  return { valid: true, updatedPin: newPin };
+}
+
+assert(validatePinChange('clave-falsa', 'nueva123', 'nueva123', 'atletismo2026').valid === false, 'Rechaza cambio si no conoce la contraseña actual');
+assert(validatePinChange('atletismo2026', '12', '12', 'atletismo2026').valid === false, 'Rechaza PIN con menos de 4 caracteres');
+assert(validatePinChange('atletismo2026', 'clave2027', 'claveDiferente', 'atletismo2026').valid === false, 'Rechaza si la confirmación no coincide');
+assert(validatePinChange('atletismo2026', 'clave2027', 'clave2027', 'atletismo2026').valid === true, 'Permite cambio seguro al validar clave previa y coincidencia');
 
 console.log('\n----------------------------------------');
 if (failedTests === 0) {

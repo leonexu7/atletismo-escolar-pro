@@ -23,20 +23,32 @@ export const DEFAULT_TOURNAMENT_INFO = {
   enableDiplomas: false // Opción en ajustes para activar/desactivar la emisión de diplomas de ganadores
 };
 
+export const MASTER_RECOVERY_KEY = 'SEP-PUEBLA-2026';
+
 export function loadTournamentState() {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (parsed && typeof parsed === 'object') {
-        return {
-          tournament: { ...DEFAULT_TOURNAMENT_INFO, ...(parsed.tournament || {}) },
-          schools: Array.isArray(parsed.schools) ? parsed.schools : [],
-          athletes: Array.isArray(parsed.athletes) ? parsed.athletes : [],
-          relays: Array.isArray(parsed.relays) ? parsed.relays : [],
-          results: parsed.results || {},
-          cloudSession: parsed.cloudSession || { enabled: false, roomCode: 'ATLETISMO-2026' }
-        };
+    if (typeof localStorage !== 'undefined') {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === 'object') {
+          const cloud = parsed.cloudSession || {};
+          // Predeterminado SIEMPRE CONECTADO A LA NUBE para evitar que los maestros no registren datos
+          const isOnline = cloud.userExplicitlyChoseOffline ? false : true;
+
+          return {
+            tournament: { ...DEFAULT_TOURNAMENT_INFO, ...(parsed.tournament || {}) },
+            schools: Array.isArray(parsed.schools) ? parsed.schools : [],
+            athletes: Array.isArray(parsed.athletes) ? parsed.athletes : [],
+            relays: Array.isArray(parsed.relays) ? parsed.relays : [],
+            results: parsed.results || {},
+            cloudSession: {
+              enabled: isOnline,
+              userExplicitlyChoseOffline: Boolean(cloud.userExplicitlyChoseOffline),
+              roomCode: (cloud.roomCode || 'ATLETISMO-2026').trim().toUpperCase()
+            }
+          };
+        }
       }
     }
   } catch (e) {
@@ -49,7 +61,7 @@ export function loadTournamentState() {
     athletes: [],
     relays: [],
     results: {},
-    cloudSession: { enabled: false, roomCode: 'ATLETISMO-2026' }
+    cloudSession: { enabled: true, userExplicitlyChoseOffline: false, roomCode: 'ATLETISMO-2026' }
   };
 }
 
