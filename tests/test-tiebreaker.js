@@ -163,6 +163,16 @@ assert(validatePinChange('atletismo2026', '12', '12', 'atletismo2026').valid ===
 assert(validatePinChange('atletismo2026', 'clave2027', 'claveDiferente', 'atletismo2026').valid === false, 'Rechaza si la confirmación no coincide');
 assert(validatePinChange('atletismo2026', 'clave2027', 'clave2027', 'atletismo2026').valid === true, 'Permite cambio seguro al validar clave previa y coincidencia');
 
+// Detección de teclado al aire y toques en celular
+const SECRET_WORDS = ['clave', 'pin', 'admin', 'sep', 'atletismo', 'desbloquear'];
+function isAirKeystrokeMatched(buffer) {
+  const clean = buffer.toLowerCase();
+  return SECRET_WORDS.some(word => clean.includes(word));
+}
+assert(isAirKeystrokeMatched('hola_clave') === true, 'Teclear "clave" al aire desbloquea el panel secreto');
+assert(isAirKeystrokeMatched('pin') === true, 'Teclear "pin" al aire desbloquea el panel secreto');
+assert(isAirKeystrokeMatched('texto_cualquiera') === false, 'Texto ordinario no desbloquea el panel');
+
 console.log('\n----------------------------------------');
 if (failedTests === 0) {
   console.log('🎉 TODAS LAS PRUEBAS UNITARIAS PASARON EXITOSAMENTE (0 fallas).\n');

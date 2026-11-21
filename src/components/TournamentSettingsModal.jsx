@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   Settings,
   X,
@@ -15,7 +15,8 @@ import {
   Unlock,
   KeyRound,
   ShieldCheck,
-  CheckCircle2
+  CheckCircle2,
+  Keyboard
 } from 'lucide-react';
 import { exportTournamentBackupToFile, importTournamentFromFile, MASTER_RECOVERY_KEY } from '../utils/storage';
 import defaultBannerLogo from '../assets/puebla_sep_banner.jpg';
@@ -30,14 +31,67 @@ export default function TournamentSettingsModal({
   fullState
 }) {
   const [formData, setFormData] = useState({ ...tournament });
-  const [isChangingPin, setIsChangingPin] = useState(false);
-  const [currentPinInput, setCurrentPinInput] = useState('');
-  const [newPinInput, setNewPinInput] = useState('');
-  const [confirmPinInput, setConfirmPinInput] = useState('');
-  const [pinChangeError, setPinChangeError] = useState('');
-  const [pinChangeSuccess, setPinChangeSuccess] = useState(false);
+  const [isSecretPanelUnlocked, setIsSecretPanelUnlocked] = useState(false);
+  const [showAirKeyboardInput, setShowAirKeyboardInput] = useState(false);
+  const [airTypedText, setAirTypedText] = useState('');
+  const [tapCount, setTapCount] = useState(0);
+  const tapTimerRef = useRef(null);
+  const typedBufferRef = useRef('');
+  const bufferTimerRef = useRef(null);
   const fileInputRef = useRef(null);
   const logoInputRef = useRef(null);
+
+  const SECRET_WORDS = ['clave', 'pin', 'admin', 'sep', 'atletismo', 'desbloquear'];
+
+  // Detección de "Teclear al aire" en computadora/laptop mientras está en Ajustes
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleKeyDown = (e) => {
+      // Si el usuario está escribiendo en un input o textarea normal, no capturar como 'al aire'
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+        return;
+      }
+
+      if (e.key && e.key.length === 1) {
+        typedBufferRef.current += e.key.toLowerCase();
+        if (typedBufferRef.current.length > 20) {
+          typedBufferRef.current = typedBufferRef.current.slice(-20);
+        }
+
+        const matched = SECRET_WORDS.some(word => typedBufferRef.current.includes(word));
+        if (matched) {
+          setIsSecretPanelUnlocked(true);
+          typedBufferRef.current = '';
+        }
+
+        clearTimeout(bufferTimerRef.current);
+        bufferTimerRef.current = setTimeout(() => {
+          typedBufferRef.current = '';
+        }, 2500);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      clearTimeout(bufferTimerRef.current);
+    };
+  }, [isOpen]);
+
+  // Toques en el escudo para desbloqueo secreto en celular y laptop
+  const handleShieldTap = () => {
+    setTapCount(prev => {
+      const next = prev + 1;
+      if (next >= 4) {
+        setIsSecretPanelUnlocked(true);
+        return 0;
+      }
+      return next;
+    });
+    clearTimeout(tapTimerRef.current);
+    tapTimerRef.current = setTimeout(() => setTapCount(0), 1800);
+  };
 
   if (!isOpen) return null;
 
@@ -316,161 +370,126 @@ export default function TournamentSettingsModal({
             </div>
           </div>
 
-          {/* Zona de Seguridad Especial para la Contraseña de Mesa de Control */}
+          {/* Zona Secreta de Contraseña de Mesa de Control (Desbloqueo al aire en lap y celular) */}
           <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200 space-y-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-2.5">
-                <div className="w-8 h-8 rounded-xl bg-slate-900 text-amber-400 flex items-center justify-center shrink-0">
+                <div
+                  onClick={handleShieldTap}
+                  title="Mesa de Control Oficial"
+                  className="w-8 h-8 rounded-xl bg-slate-900 text-amber-400 flex items-center justify-center shrink-0 cursor-pointer select-none active:scale-90 transition-transform shadow-2xs"
+                >
                   <ShieldCheck className="w-4 h-4" />
                 </div>
                 <div>
                   <span className="text-xs font-bold text-slate-800 block">
                     Contraseña Oficial de Mesa de Control (PIN)
                   </span>
-                  <span className="text-[11px] text-slate-500 font-mono">
-                    Estado: •••••••• (Oculta por seguridad contra bromas)
-                  </span>
+                  <div
+                    onClick={() => setShowAirKeyboardInput(prev => !prev)}
+                    className="text-[11px] text-slate-500 font-mono cursor-pointer select-none flex items-center space-x-1"
+                    title="Toca para escribir clave secreta de desbloqueo"
+                  >
+                    <span>PIN: ••••••••</span>
+                    <Keyboard className="w-3.5 h-3.5 text-slate-400 hover:text-amber-600 transition-colors" />
+                  </div>
                 </div>
               </div>
 
-              {!isChangingPin && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsChangingPin(true);
-                    setPinChangeError('');
-                    setCurrentPinInput('');
-                    setNewPinInput('');
-                    setConfirmPinInput('');
-                  }}
-                  className="px-3 py-1.5 bg-white hover:bg-slate-100 text-slate-800 border border-slate-300 rounded-xl text-xs font-bold transition-all shadow-2xs flex items-center space-x-1.5 shrink-0"
-                >
-                  <KeyRound className="w-3.5 h-3.5 text-amber-600" />
-                  <span>Cambiar Clave</span>
-                </button>
+              {isSecretPanelUnlocked ? (
+                <span className="text-[10px] font-bold text-amber-800 bg-amber-100 border border-amber-300 px-2.5 py-0.5 rounded-full flex items-center space-x-1 animate-in fade-in">
+                  <Unlock className="w-3 h-3 text-amber-600" />
+                  <span>Desbloqueado</span>
+                </span>
+              ) : (
+                <span className="text-[10px] font-medium text-slate-400 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-full">
+                  Oficial
+                </span>
               )}
             </div>
 
-            {pinChangeSuccess && (
-              <div className="bg-emerald-50 border border-emerald-300 text-emerald-800 px-3 py-2 rounded-xl text-xs flex items-center space-x-2 animate-in fade-in">
-                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                <span className="font-semibold">¡Contraseña de Mesa de Control actualizada exitosamente! Recuerda guardar los ajustes.</span>
-              </div>
-            )}
-
-            {/* Procedimiento Especial de Cambio de Contraseña */}
-            {isChangingPin && (
-              <div className="bg-white border-2 border-amber-300 rounded-xl p-3.5 space-y-3 shadow-xs animate-in fade-in">
-                <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-                  <span className="text-xs font-bold text-slate-900 flex items-center space-x-1.5">
-                    <Lock className="w-3.5 h-3.5 text-amber-600" />
-                    <span>Procedimiento de Cambio Seguro</span>
+            {/* Entrada rápida al aire para celular (o laptop) */}
+            {showAirKeyboardInput && !isSecretPanelUnlocked && (
+              <div className="bg-white border border-amber-300 rounded-xl p-2.5 space-y-1.5 shadow-2xs animate-in fade-in">
+                <div className="flex items-center justify-between text-[11px] font-bold text-slate-700">
+                  <span className="flex items-center space-x-1">
+                    <Keyboard className="w-3.5 h-3.5 text-amber-600" />
+                    <span>Escribe al aire la palabra secreta:</span>
                   </span>
                   <button
                     type="button"
-                    onClick={() => setIsChangingPin(false)}
+                    onClick={() => setShowAirKeyboardInput(false)}
                     className="text-slate-400 hover:text-slate-600 p-0.5"
                   >
-                    <X className="w-4 h-4" />
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+                <input
+                  type="text"
+                  autoFocus
+                  value={airTypedText}
+                  onChange={(e) => {
+                    const val = e.target.value.toLowerCase();
+                    setAirTypedText(val);
+                    if (SECRET_WORDS.some(word => val.includes(word))) {
+                      setIsSecretPanelUnlocked(true);
+                      setShowAirKeyboardInput(false);
+                      setAirTypedText('');
+                    }
+                  }}
+                  placeholder="Escribe la palabra secreta (ej. clave, pin, sep)..."
+                  className="w-full bg-slate-50 border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 outline-none focus:bg-white focus:ring-2 focus:ring-amber-400 font-mono"
+                />
+              </div>
+            )}
+
+            {/* Panel de edición desbloqueado al teclear al aire o pulsar el escudo */}
+            {isSecretPanelUnlocked && (
+              <div className="bg-white border-2 border-amber-300 rounded-xl p-3.5 space-y-3 shadow-xs animate-in fade-in">
+                <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                  <div className="flex items-center space-x-1.5 text-xs font-bold text-amber-900">
+                    <Unlock className="w-3.5 h-3.5 text-amber-600" />
+                    <span>Panel de Contraseña Desbloqueado</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsSecretPanelUnlocked(false)}
+                    className="text-xs text-slate-500 hover:text-slate-800 font-semibold bg-slate-100 px-2 py-0.5 rounded-lg border border-slate-200 transition-colors"
+                  >
+                    Ocultar Panel
                   </button>
                 </div>
 
-                <p className="text-[11px] text-slate-600">
-                  Para evitar que alguien cambie la contraseña por broma o accidente, debes validar primero tu contraseña actual.
-                </p>
-
-                <div className="space-y-2">
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-700 mb-0.5">
-                      1. Contraseña Actual *
-                    </label>
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                    Modificar Contraseña de Mesa de Control (PIN):
+                  </label>
+                  <div className="flex items-center space-x-2">
                     <input
-                      type="password"
-                      value={currentPinInput}
-                      onChange={(e) => setCurrentPinInput(e.target.value)}
-                      placeholder="Ingresa la contraseña actual..."
-                      className="w-full bg-slate-50 border border-slate-300 rounded-xl px-2.5 py-1.5 text-xs text-slate-900 outline-none focus:bg-white focus:ring-2 focus:ring-amber-400 font-mono"
+                      type="text"
+                      value={formData.adminPin || ''}
+                      onChange={(e) => handleChange('adminPin', e.target.value)}
+                      placeholder="Ej. atletismo2026"
+                      className="flex-1 bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-mono font-bold text-slate-900 outline-none focus:bg-white focus:ring-2 focus:ring-amber-400"
                     />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!formData.adminPin || formData.adminPin.trim().length < 4) {
+                          alert('La contraseña debe tener al menos 4 caracteres.');
+                          return;
+                        }
+                        alert('¡Contraseña actualizada! Recuerda pulsar "Guardar Ajustes" para aplicar los cambios permanentemente.');
+                        setIsSecretPanelUnlocked(false);
+                      }}
+                      className="px-3.5 py-2 bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-bold rounded-xl shadow-2xs transition-colors shrink-0"
+                    >
+                      Aceptar
+                    </button>
                   </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    <div>
-                      <label className="block text-[11px] font-bold text-slate-700 mb-0.5">
-                        2. Nueva Contraseña *
-                      </label>
-                      <input
-                        type="password"
-                        value={newPinInput}
-                        onChange={(e) => setNewPinInput(e.target.value)}
-                        placeholder="Mínimo 4 caracteres..."
-                        className="w-full bg-slate-50 border border-slate-300 rounded-xl px-2.5 py-1.5 text-xs text-slate-900 outline-none focus:bg-white focus:ring-2 focus:ring-amber-400 font-mono"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[11px] font-bold text-slate-700 mb-0.5">
-                        3. Confirmar Nueva Contraseña *
-                      </label>
-                      <input
-                        type="password"
-                        value={confirmPinInput}
-                        onChange={(e) => setConfirmPinInput(e.target.value)}
-                        placeholder="Repite la contraseña..."
-                        className="w-full bg-slate-50 border border-slate-300 rounded-xl px-2.5 py-1.5 text-xs text-slate-900 outline-none focus:bg-white focus:ring-2 focus:ring-amber-400 font-mono"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {pinChangeError && (
-                  <p className="text-[11px] text-rose-600 font-bold bg-rose-50 border border-rose-200 p-2 rounded-lg">
-                    {pinChangeError}
+                  <p className="text-[10px] text-slate-500 mt-1">
+                    Mínimo 4 caracteres. Haz clic en "Guardar Ajustes" para guardarla permanentemente.
                   </p>
-                )}
-
-                <div className="flex justify-end space-x-2 pt-1">
-                  <button
-                    type="button"
-                    onClick={() => setIsChangingPin(false)}
-                    className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setPinChangeError('');
-                      const cleanCurrent = currentPinInput.trim();
-                      const cleanNew = newPinInput.trim();
-                      const cleanConfirm = confirmPinInput.trim();
-
-                      const actualCurrentPin = formData.adminPin || 'atletismo2026';
-                      if (cleanCurrent !== actualCurrentPin && cleanCurrent !== MASTER_RECOVERY_KEY) {
-                        setPinChangeError('La contraseña actual no es correcta. No puedes modificar la clave.');
-                        return;
-                      }
-
-                      if (cleanNew.length < 4) {
-                        setPinChangeError('La nueva contraseña debe tener al menos 4 caracteres.');
-                        return;
-                      }
-
-                      if (cleanNew !== cleanConfirm) {
-                        setPinChangeError('Las contraseñas nuevas no coinciden. Verifícalas.');
-                        return;
-                      }
-
-                      setFormData(prev => ({ ...prev, adminPin: cleanNew }));
-                      setIsChangingPin(false);
-                      setCurrentPinInput('');
-                      setNewPinInput('');
-                      setConfirmPinInput('');
-                      setPinChangeSuccess(true);
-                      setTimeout(() => setPinChangeSuccess(false), 4000);
-                    }}
-                    className="px-4 py-1.5 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold rounded-xl text-xs shadow-2xs"
-                  >
-                    Actualizar Contraseña
-                  </button>
                 </div>
               </div>
             )}
