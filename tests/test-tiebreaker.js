@@ -197,9 +197,11 @@ const mockRunnerFinishTimestamp = mockStartTimestamp + 10450; // Corrió 10.45 s
 const calculatedTimeSeconds = Number(((mockRunnerFinishTimestamp - mockStartTimestamp) / 1000).toFixed(2));
 assert(calculatedTimeSeconds === 10.45, 'El tiempo calculado debe ser exactamente 10.45s a pesar de 185ms de latencia de red');
 
-// 2. Soporte de 4, 6 y 8 carriles:
-const supportedLaneCounts = [4, 6, 8];
-assert(supportedLaneCounts.includes(4) && supportedLaneCounts.includes(6) && supportedLaneCounts.includes(8), 'Debe admitir selector de 4, 6 y 8 carriles');
+// 2. Soporte flexible de 2 a 8 carriles (ej. 5 carriles):
+const supportedLaneCounts = [2, 3, 4, 5, 6, 7, 8];
+assert(supportedLaneCounts.includes(2), 'Debe admitir 2 carriles');
+assert(supportedLaneCounts.includes(5), 'Debe admitir 5 carriles (requerimiento explícito del usuario)');
+assert(supportedLaneCounts.includes(8), 'Debe admitir hasta 8 carriles');
 
 // 3. Conversión de splits por carril a registros de corredores:
 const mockHeatRunners = [
