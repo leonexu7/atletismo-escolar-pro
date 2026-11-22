@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   Timer,
   Play,
@@ -41,6 +41,54 @@ export default function TrackJudgeView({
   const [isStopwatchOpen, setIsStopwatchOpen] = useState(false);
   const [stopwatchTargetAthleteId, setStopwatchTargetAthleteId] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
+
+  // Aviso temporal de Sesión Activa de Mesa de Control (Auto-ocultado a los 10 segundos)
+  const [showAdminBanner, setShowAdminBanner] = useState(() => {
+    if (!isAdmin) return false;
+    try {
+      const dismissed = sessionStorage.getItem('track_judge_banner_dismissed');
+      return !dismissed;
+    } catch (_) {
+      return true;
+    }
+  });
+
+  useEffect(() => {
+    if (!isAdmin) {
+      setShowAdminBanner(false);
+      try {
+        sessionStorage.removeItem('track_judge_banner_dismissed');
+      } catch (_) {}
+      return;
+    }
+
+    try {
+      const dismissed = sessionStorage.getItem('track_judge_banner_dismissed');
+      if (!dismissed) {
+        setShowAdminBanner(true);
+        const timer = setTimeout(() => {
+          setShowAdminBanner(false);
+          try {
+            sessionStorage.setItem('track_judge_banner_dismissed', 'true');
+          } catch (_) {}
+        }, 10000); // 10 segundos exactos requeridos por el usuario
+        return () => clearTimeout(timer);
+      } else {
+        setShowAdminBanner(false);
+      }
+    } catch (_) {
+      setShowAdminBanner(true);
+      const timer = setTimeout(() => setShowAdminBanner(false), 10000);
+      return () => clearTimeout(timer);
+    }
+  }, [isAdmin]);
+
+  const handleDismissAdminBanner = () => {
+    setShowAdminBanner(false);
+    try {
+      sessionStorage.setItem('track_judge_banner_dismissed', 'true');
+    } catch (_) {}
+  };
 
   const activeEvent = trackEvents.find(e => e.id === selectedEventId) || trackEvents[0];
 
@@ -254,14 +302,24 @@ export default function TrackJudgeView({
             </button>
           )}
         </div>
-      ) : (
-        <div className="bg-emerald-50/70 border border-emerald-200 text-emerald-800 px-4 py-2.5 rounded-2xl flex items-center space-x-2 text-xs shadow-2xs">
-          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-          <span className="font-semibold">
-            Sesión de Juez Oficial Activa: Tienes permisos para cronometrar, capturar y modificar marcas de pista.
-          </span>
+      ) : showAdminBanner ? (
+        <div className="bg-emerald-50/80 border border-emerald-200 text-emerald-800 px-4 py-2.5 rounded-2xl flex items-center justify-between text-xs shadow-2xs transition-all duration-300 animate-in fade-in">
+          <div className="flex items-center space-x-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+            <span className="font-semibold">
+              Sesión de Juez Oficial Activa: Tienes permisos para cronometrar, capturar y modificar marcas de pista.
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={handleDismissAdminBanner}
+            className="text-emerald-700 hover:text-emerald-950 p-1 rounded-lg hover:bg-emerald-100/60 transition-colors shrink-0 ml-2"
+            title="Cerrar aviso ahora"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
         </div>
-      )}
+      ) : null}
 
       {/* Selector de Prueba de Pista Pastel */}
       <div className="bg-white border border-slate-200/90 rounded-2xl p-4 sm:p-6 shadow-xs">

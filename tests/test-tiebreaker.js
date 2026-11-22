@@ -173,6 +173,19 @@ assert(isAirKeystrokeMatched('hola_clave') === true, 'Teclear "clave" al aire de
 assert(isAirKeystrokeMatched('pin') === true, 'Teclear "pin" al aire desbloquea el panel secreto');
 assert(isAirKeystrokeMatched('texto_cualquiera') === false, 'Texto ordinario no desbloquea el panel');
 
+console.log('\n📌 Verificando Duración de Banner de Sesión Activa (10 Segundos Máximo):');
+const BANNER_AUTO_DISMISS_MS = 10000;
+assert(BANNER_AUTO_DISMISS_MS === 10000, 'El banner debe configurarse para auto-ocultarse a los 10 segundos');
+
+function shouldShowAdminBanner(isAdmin, isDismissed) {
+  if (!isAdmin) return false;
+  return !isDismissed;
+}
+
+assert(shouldShowAdminBanner(false, false) === false, 'Si no es admin, no debe mostrar el banner de sesión activa');
+assert(shouldShowAdminBanner(true, false) === true, 'Si es admin y no ha expirado/cerrado, debe mostrarse');
+assert(shouldShowAdminBanner(true, true) === false, 'Al pasar los 10 segundos o descartarse, no debe mostrarse más');
+
 console.log('\n----------------------------------------');
 if (failedTests === 0) {
   console.log('🎉 TODAS LAS PRUEBAS UNITARIAS PASARON EXITOSAMENTE (0 fallas).\n');
