@@ -182,3 +182,97 @@ export function syncFullTournamentToCloud(roomCode = 'ATLETISMO-2026', fullState
     return false;
   });
 }
+
+/**
+ * Transmite la salida oficial disparada por el Juez de Salida (Starter)
+ * a todos los cronometristas de meta en tiempo real.
+ */
+export function broadcastRaceStart(roomCode = 'ATLETISMO-2026', raceData) {
+  const db = getFirestoreDB();
+  if (!db) return Promise.resolve(false);
+
+  const cleanRoom = (roomCode || 'ATLETISMO-2026').trim().toUpperCase();
+  const docRef = doc(db, 'atletismo_tournaments', cleanRoom);
+
+  return setDoc(
+    docRef,
+    {
+      sport: 'atletismo',
+      appName: 'Atletismo Escolar Pro',
+      activeRaceSession: {
+        status: 'running',
+        startTimestamp: raceData.startTimestamp || Date.now(),
+        eventId: raceData.eventId || 'pista_75m',
+        heatIndex: raceData.heatIndex !== undefined ? raceData.heatIndex : 0,
+        heatName: raceData.heatName || 'Serie 1',
+        lanesCount: raceData.lanesCount || 6,
+        starterName: raceData.starterName || 'Juez de Salida',
+        updatedAt: new Date().toISOString()
+      }
+    },
+    { merge: true }
+  ).catch(err => {
+    console.error('Error al transmitir salida de carrera:', err);
+    return false;
+  });
+}
+
+/**
+ * Transmite una señal de reinicio o salida en falso a la meta
+ */
+export function broadcastRaceReset(roomCode = 'ATLETISMO-2026', reason = 'reset') {
+  const db = getFirestoreDB();
+  if (!db) return Promise.resolve(false);
+
+  const cleanRoom = (roomCode || 'ATLETISMO-2026').trim().toUpperCase();
+  const docRef = doc(db, 'atletismo_tournaments', cleanRoom);
+
+  return setDoc(
+    docRef,
+    {
+      sport: 'atletismo',
+      appName: 'Atletismo Escolar Pro',
+      activeRaceSession: {
+        status: reason === 'false_start' ? 'false_start' : 'idle',
+        startTimestamp: null,
+        reason,
+        updatedAt: new Date().toISOString()
+      }
+    },
+    { merge: true }
+  ).catch(err => {
+    console.error('Error al transmitir reinicio de carrera:', err);
+    return false;
+  });
+}
+
+/**
+ * Transmite el estado preparatorio ("A sus marcas", "Listos")
+ */
+export function broadcastRacePreparation(roomCode = 'ATLETISMO-2026', stage, meta = {}) {
+  const db = getFirestoreDB();
+  if (!db) return Promise.resolve(false);
+
+  const cleanRoom = (roomCode || 'ATLETISMO-2026').trim().toUpperCase();
+  const docRef = doc(db, 'atletismo_tournaments', cleanRoom);
+
+  return setDoc(
+    docRef,
+    {
+      sport: 'atletismo',
+      appName: 'Atletismo Escolar Pro',
+      activeRaceSession: {
+        status: stage, // 'marks' | 'ready' | 'idle'
+        eventId: meta.eventId || 'pista_75m',
+        heatIndex: meta.heatIndex !== undefined ? meta.heatIndex : 0,
+        heatName: meta.heatName || 'Serie 1',
+        lanesCount: meta.lanesCount || 6,
+        updatedAt: new Date().toISOString()
+      }
+    },
+    { merge: true }
+  ).catch(err => {
+    console.error('Error al transmitir preparación:', err);
+    return false;
+  });
+}

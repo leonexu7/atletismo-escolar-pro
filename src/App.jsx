@@ -72,7 +72,8 @@ export default function App() {
             athletes: Array.isArray(cloudData.athletes) && cloudData.athletes.length > 0 ? cloudData.athletes : prev.athletes,
             schools: Array.isArray(cloudData.schools) && cloudData.schools.length > 0 ? cloudData.schools : prev.schools,
             relays: Array.isArray(cloudData.relays) ? cloudData.relays : prev.relays,
-            tournament: cloudData.tournament ? { ...prev.tournament, ...cloudData.tournament } : prev.tournament
+            tournament: cloudData.tournament ? { ...prev.tournament, ...cloudData.tournament } : prev.tournament,
+            activeRaceSession: cloudData.activeRaceSession || prev.activeRaceSession
           }));
         }
       }
@@ -311,6 +312,8 @@ export default function App() {
             onOpenLiveResults={handleSelectEventForPodium}
             isAdmin={isAdmin}
             onOpenAdminLogin={() => setIsAdminLoginOpen(true)}
+            roomCode={state.cloudSession?.roomCode || 'ATLETISMO-2026'}
+            activeRaceSession={state.activeRaceSession}
           />
         )}
 

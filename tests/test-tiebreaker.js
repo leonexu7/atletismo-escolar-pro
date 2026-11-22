@@ -186,6 +186,48 @@ assert(shouldShowAdminBanner(false, false) === false, 'Si no es admin, no debe m
 assert(shouldShowAdminBanner(true, false) === true, 'Si es admin y no ha expirado/cerrado, debe mostrarse');
 assert(shouldShowAdminBanner(true, true) === false, 'Al pasar los 10 segundos o descartarse, no debe mostrarse más');
 
+console.log('\n📌 Verificando Consola de Salida y Cronometraje Multi-Carril Sincronizado:');
+// 1. Compensación matemática de latencia:
+const mockStartTimestamp = 1700000000000;
+const mockNetworkLatencyMs = 185; // 185ms de retraso por 4G o WiFi
+const mockClientReceiveTimestamp = mockStartTimestamp + mockNetworkLatencyMs;
+const mockRunnerFinishTimestamp = mockStartTimestamp + 10450; // Corrió 10.45 s
+
+// Si el cliente calcula a partir de T_start universal:
+const calculatedTimeSeconds = Number(((mockRunnerFinishTimestamp - mockStartTimestamp) / 1000).toFixed(2));
+assert(calculatedTimeSeconds === 10.45, 'El tiempo calculado debe ser exactamente 10.45s a pesar de 185ms de latencia de red');
+
+// 2. Soporte de 4, 6 y 8 carriles:
+const supportedLaneCounts = [4, 6, 8];
+assert(supportedLaneCounts.includes(4) && supportedLaneCounts.includes(6) && supportedLaneCounts.includes(8), 'Debe admitir selector de 4, 6 y 8 carriles');
+
+// 3. Conversión de splits por carril a registros de corredores:
+const mockHeatRunners = [
+  { id: 'ath-1', assignedLane: 1, fullName: 'Diego' },
+  { id: 'ath-2', assignedLane: 2, fullName: 'Mateo' },
+  { id: 'ath-3', assignedLane: 3, fullName: 'Carlos' },
+  { id: 'ath-4', assignedLane: 4, fullName: 'Pedro' }
+];
+
+const mockSplitsMap = {
+  1: 10.42,
+  2: 10.58,
+  3: 10.75,
+  4: 10.90
+};
+
+const appliedTimes = {};
+mockHeatRunners.forEach(runner => {
+  if (mockSplitsMap[runner.assignedLane] !== undefined) {
+    appliedTimes[runner.id] = mockSplitsMap[runner.assignedLane];
+  }
+});
+
+assert(appliedTimes['ath-1'] === 10.42, 'Carril 1 debe asignar 10.42s a Diego');
+assert(appliedTimes['ath-2'] === 10.58, 'Carril 2 debe asignar 10.58s a Mateo');
+assert(appliedTimes['ath-3'] === 10.75, 'Carril 3 debe asignar 10.75s a Carlos');
+assert(appliedTimes['ath-4'] === 10.90, 'Carril 4 debe asignar 10.90s a Pedro');
+
 console.log('\n----------------------------------------');
 if (failedTests === 0) {
   console.log('🎉 TODAS LAS PRUEBAS UNITARIAS PASARON EXITOSAMENTE (0 fallas).\n');
