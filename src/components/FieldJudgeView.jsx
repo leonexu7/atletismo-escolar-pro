@@ -326,16 +326,13 @@ export default function FieldJudgeView({
                   setSelectedEventId(ev.id);
                   setLocalAttempts({});
                 }}
-                className={`p-3 rounded-xl border text-left transition-all ${
+                className={`p-3 rounded-xl border text-center transition-all ${
                   isSelected
                     ? 'bg-emerald-500 border-emerald-600 text-white shadow-xs font-bold'
-                    : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
+                    : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100 font-semibold'
                 }`}
               >
-                <div className="text-xs font-bold">{ev.name}</div>
-                <div className={`text-[10px] mt-0.5 ${isSelected ? 'text-emerald-100' : 'text-emerald-700 font-medium'}`}>
-                  {ev.spec}
-                </div>
+                <div className="text-xs">{ev.name}</div>
               </button>
             );
           })}

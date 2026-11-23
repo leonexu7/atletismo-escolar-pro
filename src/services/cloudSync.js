@@ -6,7 +6,7 @@
  * Aislamiento de Datos Garantizado:
  * - Colección dedicada: 'atletismo_tournaments'
  * - Etiquetado estricto por deporte: sport = 'atletismo'
- * - Cero colisión con Karate Brackets Pro u otros proyectos de Firebase.
+ * - Colección dedicada y autónoma para Atletismo Escolar Pro.
  */
 
 import { initializeApp, getApps, getApp } from '@firebase/app';

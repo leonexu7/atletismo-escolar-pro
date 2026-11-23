@@ -95,7 +95,7 @@ export default function TeacherRegistrationView({
     eventIds: []
   });
 
-  // Estado del modal de edición de competidor (estilo karate)
+  // Estado del modal de edición de competidor
   const [editingAthlete, setEditingAthlete] = useState(null);
 
   // Verificación de fecha límite de inscripciones
@@ -290,7 +290,7 @@ export default function TeacherRegistrationView({
     }
   };
 
-  // Compartir Cédula por WhatsApp (estilo karate)
+  // Compartir Cédula por WhatsApp
   const handleSendWhatsAppRoster = () => {
     if (schoolAthletes.length === 0) {
       alert('Aún no tienes alumnos registrados para generar el reporte de WhatsApp.');
@@ -699,7 +699,7 @@ export default function TeacherRegistrationView({
           </form>
         </div>
 
-        {/* Padrón y Gestión de Atletas de la Escuela (7 Columnas - Estilo Karate) */}
+        {/* Padrón y Gestión de Atletas de la Escuela (7 Columnas) */}
         <div className="lg:col-span-7 bg-white border border-slate-200/90 rounded-2xl p-4 sm:p-5 shadow-xs flex flex-col justify-between">
           <div>
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3 border-b border-slate-100">
@@ -740,7 +740,7 @@ export default function TeacherRegistrationView({
               </div>
             </div>
 
-            {/* Listado de Tarjetas de Alumnos (Estilo Karate con Botón Editar Claro) */}
+            {/* Listado de Tarjetas de Alumnos (con Botón Editar Claro) */}
             <div className="divide-y divide-slate-100 max-h-[480px] overflow-y-auto mt-2 pr-1">
               {filteredAthletes.length === 0 ? (
                 <div className="py-12 text-center text-slate-400 text-xs italic">
@@ -810,7 +810,7 @@ export default function TeacherRegistrationView({
                       </div>
                     </div>
 
-                    {/* Botón Editar Competidor y Eliminar (Exacto estilo karate) */}
+                    {/* Botón Editar Competidor y Eliminar */}
                     {isLockedForTeacher ? (
                       <div className="flex items-center space-x-1 shrink-0 self-end sm:self-center pl-7 sm:pl-0">
                         <span
@@ -865,7 +865,7 @@ export default function TeacherRegistrationView({
         </div>
       </div>
 
-      {/* MODAL DE EDICIÓN DE COMPETIDOR (ESTILO KARATE) */}
+      {/* MODAL DE EDICIÓN DE COMPETIDOR */}
       {editingAthlete && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in">
           <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-5 sm:p-6 space-y-4">

@@ -45,7 +45,7 @@ export default function App() {
     };
   });
 
-  // Pestaña inicial: Portal de Maestros (Inscripciones), tal como en el sistema de karate
+  // Pestaña inicial: Portal de Maestros (Inscripciones)
   const [activeTab, setActiveTab] = useState('registration');
   const [selectedPodiumEventId, setSelectedPodiumEventId] = useState('campo_longitud');
 

@@ -12,17 +12,9 @@ import {
   Unlock,
   ShieldCheck,
   AlertTriangle,
-  Database,
-  Layers,
-  ChevronDown,
-  ChevronUp
+  Database
 } from 'lucide-react';
-import {
-  syncFullTournamentToCloud,
-  getActiveFirebaseConfig,
-  saveCustomFirebaseConfig,
-  DEFAULT_FIREBASE_CONFIG
-} from '../services/cloudSync';
+import { syncFullTournamentToCloud } from '../services/cloudSync';
 import { MASTER_RECOVERY_KEY } from '../utils/storage';
 
 export default function CloudSyncModal({
@@ -42,12 +34,6 @@ export default function CloudSyncModal({
   const [offlinePasswordInput, setOfflinePasswordInput] = useState('');
   const [offlineError, setOfflineError] = useState('');
 
-  // Estados de configuración de segundo proyecto de Firebase
-  const [showCustomFirebase, setShowCustomFirebase] = useState(false);
-  const activeFirebaseConfig = getActiveFirebaseConfig();
-  const [customApiKey, setCustomApiKey] = useState(activeFirebaseConfig.apiKey || '');
-  const [customProjectId, setCustomProjectId] = useState(activeFirebaseConfig.projectId || '');
-  const [customSavedMessage, setCustomSavedMessage] = useState(false);
 
   if (!isOpen) return null;
 
@@ -102,30 +88,6 @@ export default function CloudSyncModal({
     }
   };
 
-  const handleSaveSecondFirebaseProject = (e) => {
-    e.preventDefault();
-    if (!customProjectId.trim()) {
-      alert('Ingresa al menos el ID de tu proyecto de Firebase.');
-      return;
-    }
-    const newConfig = {
-      apiKey: customApiKey.trim() || activeFirebaseConfig.apiKey,
-      projectId: customProjectId.trim(),
-      authDomain: `${customProjectId.trim()}.firebaseapp.com`,
-      storageBucket: `${customProjectId.trim()}.firebasestorage.app`
-    };
-    saveCustomFirebaseConfig(newConfig);
-    setCustomSavedMessage(true);
-    setTimeout(() => setCustomSavedMessage(false), 3000);
-  };
-
-  const handleRestoreDefaultFirebase = () => {
-    saveCustomFirebaseConfig(null);
-    setCustomApiKey(DEFAULT_FIREBASE_CONFIG.apiKey);
-    setCustomProjectId(DEFAULT_FIREBASE_CONFIG.projectId);
-    setCustomSavedMessage(true);
-    setTimeout(() => setCustomSavedMessage(false), 3000);
-  };
 
   const shareableUrl = `${window.location.origin}${window.location.pathname}?room=${encodeURIComponent(roomCode)}`;
 
@@ -295,63 +257,6 @@ export default function CloudSyncModal({
             </div>
           </div>
 
-          {/* Explicación y Garantía de Aislamiento de Proyectos Firebase */}
-          <div className="bg-sky-50/70 border border-sky-200 rounded-2xl p-3.5 space-y-2">
-            <div className="flex items-center space-x-2">
-              <Layers className="w-4 h-4 text-sky-700 shrink-0" />
-              <h4 className="text-xs font-bold text-sky-950">
-                Aislamiento Total entre Karate Brackets Pro y Atletismo
-              </h4>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => setShowCustomFirebase(!showCustomFirebase)}
-              className="text-[11px] font-bold text-sky-700 hover:text-sky-900 flex items-center space-x-1 pt-1"
-            >
-              <span>{showCustomFirebase ? 'Ocultar configuración de 2º proyecto' : '¿Deseas usar un 2º Proyecto de Firebase específico? (Opcional)'}</span>
-              {showCustomFirebase ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-            </button>
-
-            {showCustomFirebase && (
-              <form onSubmit={handleSaveSecondFirebaseProject} className="pt-2 border-t border-sky-200 space-y-2.5 text-xs animate-in fade-in">
-                <p className="text-[10px] text-slate-500">
-                  Si creaste un segundo proyecto en la consola de Firebase para atletismo, introduce aquí su Project ID:
-                </p>
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-0.5">Project ID de Firebase:</label>
-                  <input
-                    type="text"
-                    value={customProjectId}
-                    onChange={(e) => setCustomProjectId(e.target.value)}
-                    placeholder="ej. atletismo-escolar-puebla"
-                    className="w-full bg-white border border-slate-300 rounded-xl px-2.5 py-1.5 text-xs font-mono"
-                  />
-                </div>
-                <div className="flex items-center space-x-2">
-                  <button
-                    type="submit"
-                    className="px-3 py-1.5 bg-sky-600 hover:bg-sky-700 text-white rounded-xl font-bold text-[11px]"
-                  >
-                    Guardar 2º Proyecto
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleRestoreDefaultFirebase}
-                    className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-[11px]"
-                  >
-                    Restablecer Predeterminado
-                  </button>
-                  {customSavedMessage && (
-                    <span className="text-[11px] font-bold text-emerald-600 flex items-center space-x-1">
-                      <Check className="w-3.5 h-3.5" />
-                      <span>Guardado</span>
-                    </span>
-                  )}
-                </div>
-              </form>
-            )}
-          </div>
 
           {/* Sincronización Manual Forzada */}
           <div className="pt-2 flex justify-between items-center border-t border-slate-100">
