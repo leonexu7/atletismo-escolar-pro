@@ -352,8 +352,9 @@ export default function FieldJudgeView({
         </div>
 
         <button
-          onClick={() => generateOfficialFieldSheetPDF(activeEvent, eligibleAthletes, tournament)}
+          onClick={() => generateOfficialFieldSheetPDF(activeEvent, eligibleAthletes, tournament, currentFieldEntries, liveRankings)}
           className="px-3 py-1.5 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-xl text-xs font-semibold flex items-center space-x-1.5 transition-colors self-end sm:self-auto"
+          title="Descargar planilla PDF con marcas de los 3 intentos y lugares calculados"
         >
           <FileText className="w-3.5 h-3.5 text-emerald-600" />
           <span>Planilla Oficial PDF</span>

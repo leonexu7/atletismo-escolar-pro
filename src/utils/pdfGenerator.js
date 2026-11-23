@@ -14,7 +14,13 @@ import { OFFICIAL_EVENTS } from '../constants/events';
 /**
  * Genera la Planilla Oficial de Jueces de Pista en orientación Horizontal
  */
-export function generateOfficialTrackSheetPDF(event, heats = [], tournamentInfo = {}) {
+export function generateOfficialTrackSheetPDF(
+  event,
+  heats = [],
+  tournamentInfo = {},
+  trackEntries = [],
+  rankedAthletes = []
+) {
   const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'letter' });
   const pageWidth = doc.internal.pageSize.getWidth();
 
@@ -53,15 +59,42 @@ export function generateOfficialTrackSheetPDF(event, heats = [], tournamentInfo 
       doc.setTextColor(185, 28, 28); // red-700
       doc.text(`SERIE ${heat.heatNumber || heatIdx + 1}`, 14, currentY + 4);
 
-      const tableBody = (heat.lanes || []).map(lane => [
-        lane.assignedLane || '-',
-        lane.bibNumber || lane.dorsal || 'S/N',
-        lane.fullName || 'Competidor',
-        lane.schoolName || 'Escuela',
-        '', // Espacio para tiempo manual
-        '', // Espacio para lugar
-        ''  // Observaciones (DNS/DNF/DQ)
-      ]);
+      const tableBody = (heat.lanes || []).map(lane => {
+        const entry = (trackEntries || []).find(e => e.athleteId === lane.id);
+        const ranked = (rankedAthletes || []).find(r => r.id === lane.id);
+
+        let timeDisplay = '';
+        let placeDisplay = '';
+        let notesDisplay = '';
+
+        if (entry) {
+          if (entry.status === 'valid' && entry.timeSeconds !== null && entry.timeSeconds !== undefined) {
+            timeDisplay = formatTrackTime(entry.timeSeconds);
+          } else if (entry.status && entry.status !== 'pending' && entry.status !== 'valid') {
+            timeDisplay = entry.status.toUpperCase();
+          }
+
+          if (entry.statusReason) {
+            notesDisplay = entry.statusReason;
+          } else if (entry.status && entry.status !== 'valid' && entry.status !== 'pending') {
+            notesDisplay = entry.status.toUpperCase();
+          }
+        }
+
+        if (ranked && ranked.rank) {
+          placeDisplay = `${ranked.rank}º`;
+        }
+
+        return [
+          lane.assignedLane || '-',
+          lane.bibNumber || lane.dorsal || 'S/N',
+          lane.fullName || 'Competidor',
+          lane.schoolName || 'Escuela',
+          timeDisplay,   // Tiempo oficial si ya corrió, o espacio en blanco si está pendiente
+          placeDisplay,  // Lugar oficial calculado o en blanco
+          notesDisplay   // Observaciones / DNS / DNF / Descalificado
+        ];
+      });
 
       autoTable(doc, {
         startY: currentY + 6,
@@ -75,8 +108,8 @@ export function generateOfficialTrackSheetPDF(event, heats = [], tournamentInfo 
           1: { cellWidth: 18, halign: 'center' },
           2: { cellWidth: 80 },
           3: { cellWidth: 70 },
-          4: { cellWidth: 30, halign: 'center' },
-          5: { cellWidth: 18, halign: 'center' },
+          4: { cellWidth: 30, halign: 'center', fontStyle: 'bold' },
+          5: { cellWidth: 18, halign: 'center', fontStyle: 'bold' },
           6: { cellWidth: 28 }
         },
         margin: { left: 14, right: 14 }
@@ -109,7 +142,13 @@ export function generateOfficialTrackSheetPDF(event, heats = [], tournamentInfo 
 /**
  * Genera la Planilla Oficial de Jueces de Campo (Saltos y Lanzamientos con 3 Intentos)
  */
-export function generateOfficialFieldSheetPDF(event, flight = [], tournamentInfo = {}) {
+export function generateOfficialFieldSheetPDF(
+  event,
+  flight = [],
+  tournamentInfo = {},
+  fieldEntries = [],
+  rankedAthletes = []
+) {
   const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'letter' });
   const pageWidth = doc.internal.pageSize.getWidth();
 
@@ -134,18 +173,48 @@ export function generateOfficialFieldSheetPDF(event, flight = [], tournamentInfo
   doc.text(`Reglamento: 3 Intentos oficiales. Gana la MEJOR marca válida.`, 110, 30);
   doc.text(`Fecha: ${tournamentInfo.date || ''}`, 220, 30);
 
-  const tableBody = (flight || []).map((athlete, idx) => [
-    idx + 1,
-    athlete.bibNumber || athlete.dorsal || 'S/N',
-    athlete.fullName || 'Competidor',
-    athlete.schoolName || 'Escuela',
-    '', // Intento 1
-    '', // Intento 2
-    '', // Intento 3
-    '', // Mejor Marca
-    '', // 2ª Mejor Marca
-    ''  // Lugar final
-  ]);
+  const tableBody = (flight || []).map((athlete, idx) => {
+    const entry = (fieldEntries || []).find(e => e.athleteId === athlete.id);
+    const ranked = (rankedAthletes || []).find(r => r.id === athlete.id);
+
+    const attempts = entry?.attempts || ranked?.attempts || [];
+    const getAttemptStr = (att) => {
+      if (!att) return '';
+      if (att.status === 'foul') return 'X';
+      if (att.status === 'pass') return '-';
+      if (att.value !== null && att.value !== undefined && att.value !== '') {
+        return formatFieldDistance(att.value);
+      }
+      return '';
+    };
+
+    const att1 = getAttemptStr(attempts[0]);
+    const att2 = getAttemptStr(attempts[1]);
+    const att3 = getAttemptStr(attempts[2]);
+
+    const bestMarkStr = ranked?.bestMark !== null && ranked?.bestMark !== undefined
+      ? formatFieldDistance(ranked.bestMark)
+      : (entry?.bestMark ? formatFieldDistance(entry.bestMark) : '');
+
+    const secondBestStr = ranked?.secondBestMark !== null && ranked?.secondBestMark !== undefined
+      ? formatFieldDistance(ranked.secondBestMark)
+      : '';
+
+    const placeStr = ranked?.rank ? `${ranked.rank}º` : '';
+
+    return [
+      idx + 1,
+      athlete.bibNumber || athlete.dorsal || 'S/N',
+      athlete.fullName || 'Competidor',
+      athlete.schoolName || 'Escuela',
+      att1,
+      att2,
+      att3,
+      bestMarkStr,
+      secondBestStr,
+      placeStr
+    ];
+  });
 
   autoTable(doc, {
     startY: 34,
@@ -175,7 +244,7 @@ export function generateOfficialFieldSheetPDF(event, flight = [], tournamentInfo
       6: { cellWidth: 20, halign: 'center' },
       7: { cellWidth: 26, halign: 'center', fontStyle: 'bold' },
       8: { cellWidth: 20, halign: 'center' },
-      9: { cellWidth: 16, halign: 'center' }
+      9: { cellWidth: 16, halign: 'center', fontStyle: 'bold' }
     },
     margin: { left: 14, right: 14 }
   });

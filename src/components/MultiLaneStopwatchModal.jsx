@@ -85,7 +85,8 @@ export default function MultiLaneStopwatchModal({
   isAdmin = false,
   onOpenAdminLogin,
   roomCode = 'ATLETISMO-2026',
-  activeRaceSession = null
+  activeRaceSession = null,
+  allAthletes = []
 }) {
   const [currentLanesCount, setCurrentLanesCount] = useState(lanesCount || 6);
   const [viewMode, setViewMode] = useState('all'); // 'all' | 'single'
@@ -93,20 +94,84 @@ export default function MultiLaneStopwatchModal({
   const [isRaceRunning, setIsRaceRunning] = useState(false);
   const [laneTimes, setLaneTimes] = useState({}); // { [assignedLane]: elapsedMs }
   const [laneStatus, setLaneStatus] = useState({}); // { [assignedLane]: 'running' | 'stopped' }
+  const [laneAssignments, setLaneAssignments] = useState({}); // { [laneNumber]: athleteId }
   const [localElapsedMs, setLocalElapsedMs] = useState(0);
 
   const startTimestampRef = useRef(null);
   const isRunningRef = useRef(false);
   const rafRef = useRef(null);
   const lastActiveTimestampRef = useRef(null);
+  const prevHeatIndexRef = useRef(selectedHeatIndex);
 
   // Lista de 2 a 8 carriles según requerimiento
   const LANE_OPTIONS = [2, 3, 4, 5, 6, 7, 8];
 
   const activeHeat = heats[selectedHeatIndex] || heats[0] || { lanes: [] };
-  const displayedLanes = useMemo(() => {
-    return (activeHeat.lanes || []).slice(0, currentLanesCount);
-  }, [activeHeat.lanes, currentLanesCount]);
+
+  // Candidatos disponibles para seleccionar (piscina del evento o serie)
+  const candidateAthletes = useMemo(() => {
+    if (allAthletes && allAthletes.length > 0) return allAthletes;
+    return activeHeat.lanes || [];
+  }, [allAthletes, activeHeat.lanes]);
+
+  // Arreglo numérico de carriles [1, 2, ..., currentLanesCount]
+  const lanesArray = useMemo(() => {
+    return Array.from({ length: currentLanesCount }, (_, i) => i + 1);
+  }, [currentLanesCount]);
+
+  // Función constructora de asignación automática de la serie
+  const getDefaultAssignments = useCallback((heatLanes, count) => {
+    const map = {};
+    for (let laneNum = 1; laneNum <= count; laneNum++) {
+      const byLane = (heatLanes || []).find(a => Number(a.assignedLane) === laneNum);
+      if (byLane) {
+        map[laneNum] = byLane.id;
+      } else {
+        const fallback = (heatLanes || [])[laneNum - 1];
+        map[laneNum] = fallback ? fallback.id : '';
+      }
+    }
+    return map;
+  }, []);
+
+  // Inicializar o sincronizar asignaciones cuando se abre el modal o cambia la serie
+  useEffect(() => {
+    if (!isOpen) {
+      setLaneAssignments({});
+      setLaneTimes({});
+      setLaneStatus({});
+      return;
+    }
+
+    // Si cambió la serie de corredores, resetear a los de esa serie
+    if (prevHeatIndexRef.current !== selectedHeatIndex) {
+      prevHeatIndexRef.current = selectedHeatIndex;
+      setLaneAssignments(getDefaultAssignments(activeHeat.lanes, currentLanesCount));
+      setLaneTimes({});
+      setLaneStatus({});
+      return;
+    }
+
+    // Inicializar o completar carriles vacíos manteniendo personalizaciones
+    setLaneAssignments(prev => {
+      const defaults = getDefaultAssignments(activeHeat.lanes, currentLanesCount);
+      const updated = { ...defaults, ...prev };
+      for (let l = 1; l <= currentLanesCount; l++) {
+        if (updated[l] === undefined) {
+          updated[l] = defaults[l] || '';
+        }
+      }
+      return updated;
+    });
+  }, [isOpen, selectedHeatIndex, activeHeat.lanes, currentLanesCount, getDefaultAssignments]);
+
+  // Reasignar corredor de un carril manualmente
+  const handleReassignRunner = (laneNum, athleteId) => {
+    setLaneAssignments(prev => ({
+      ...prev,
+      [laneNum]: athleteId
+    }));
+  };
 
   // Escuchar la transmisión del Juez de Salida (Starter) por la Nube en tiempo real
   useEffect(() => {
@@ -122,8 +187,8 @@ export default function MultiLaneStopwatchModal({
         setIsRaceRunning(true);
 
         const initialStatus = {};
-        displayedLanes.forEach(ath => {
-          initialStatus[ath.assignedLane] = 'running';
+        lanesArray.forEach(l => {
+          initialStatus[l] = 'running';
         });
         setLaneStatus(initialStatus);
         setLaneTimes({});
@@ -143,7 +208,7 @@ export default function MultiLaneStopwatchModal({
         if (rafRef.current) cancelAnimationFrame(rafRef.current);
       }
     }
-  }, [activeRaceSession, isOpen, displayedLanes]);
+  }, [activeRaceSession, isOpen, lanesArray]);
 
   // Bucle síncrono de cronómetro de alta precisión
   useEffect(() => {
@@ -174,12 +239,12 @@ export default function MultiLaneStopwatchModal({
     setLocalElapsedMs(0);
 
     const initialStatus = {};
-    displayedLanes.forEach(ath => {
-      initialStatus[ath.assignedLane] = 'running';
+    lanesArray.forEach(laneNum => {
+      initialStatus[laneNum] = 'running';
     });
     setLaneStatus(initialStatus);
     setLaneTimes({});
-  }, [displayedLanes]);
+  }, [lanesArray]);
 
   // 2. Parar tiempo de un carril específico inmediatamente (en pointerdown para cero retardo)
   const handleStopLane = useCallback((laneNumber, e) => {
@@ -225,10 +290,10 @@ export default function MultiLaneStopwatchModal({
     const updatedTimes = { ...laneTimes };
     const updatedStatus = { ...laneStatus };
 
-    displayedLanes.forEach(ath => {
-      if (updatedStatus[ath.assignedLane] !== 'stopped') {
-        updatedTimes[ath.assignedLane] = finalElapsed;
-        updatedStatus[ath.assignedLane] = 'stopped';
+    lanesArray.forEach(laneNum => {
+      if (updatedStatus[laneNum] !== 'stopped') {
+        updatedTimes[laneNum] = finalElapsed;
+        updatedStatus[laneNum] = 'stopped';
       }
     });
 
@@ -250,28 +315,45 @@ export default function MultiLaneStopwatchModal({
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
   };
 
-  // 6. Guardar y Volcar tiempos a la Mesa de Control Oficial
+  // 6. Guardar y Volcar tiempos a la Mesa de Control Oficial (sincronizando tanto automático como manual)
   const handleApplyToControlDesk = () => {
     if (!isAdmin) {
       if (onOpenAdminLogin) onOpenAdminLogin();
       return;
     }
 
-    const formattedTimesMap = {};
-    Object.entries(laneTimes).forEach(([laneNum, ms]) => {
-      formattedTimesMap[laneNum] = Number((ms / 1000).toFixed(2));
-    });
-
-    const recordedCount = Object.keys(formattedTimesMap).length;
-    if (recordedCount === 0) {
+    const recordedLanes = Object.keys(laneTimes);
+    if (recordedLanes.length === 0) {
       alert('Aún no has parado ningún carril. Registra al menos un tiempo antes de guardar.');
       return;
     }
 
-    if (onApplyTimes) {
-      onApplyTimes(formattedTimesMap);
+    const formattedSplits = {};
+    const assignments = {};
+    let savedAthletesCount = 0;
+
+    recordedLanes.forEach(laneStr => {
+      const laneNum = Number(laneStr);
+      const ms = laneTimes[laneNum];
+      const timeSec = Number((ms / 1000).toFixed(2));
+      formattedSplits[laneNum] = timeSec;
+
+      const athId = laneAssignments[laneNum];
+      if (athId) {
+        assignments[laneNum] = athId;
+        savedAthletesCount++;
+      }
+    });
+
+    if (savedAthletesCount === 0) {
+      alert('Los carriles cronometrados no tienen corredores asignados. Por favor asigna un corredor en el carril antes de guardar.');
+      return;
     }
-    alert(`¡Se guardaron y sincronizaron ${recordedCount} tiempos oficiales en la Mesa de Control!`);
+
+    if (onApplyTimes) {
+      onApplyTimes({ splits: formattedSplits, assignments });
+    }
+    alert(`¡Se guardaron y sincronizaron ${savedAthletesCount} tiempos oficiales en la Mesa de Control!`);
     onClose();
   };
 
@@ -283,7 +365,6 @@ export default function MultiLaneStopwatchModal({
   if (!isOpen) return null;
 
   const currentSeconds = (localElapsedMs / 1000).toFixed(2);
-  const singleLaneAthlete = displayedLanes.find(a => a.assignedLane === selectedSingleLane) || displayedLanes[0];
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in">
@@ -297,7 +378,7 @@ export default function MultiLaneStopwatchModal({
             <div>
               <div className="flex items-center space-x-2">
                 <h3 className="font-bold text-sm sm:text-base text-slate-900">
-                  Cronometraje Multi-Carril Sincronizado (Meta)
+                  META / Cronometrista Multi-Carril Sincronizado
                 </h3>
                 <span className="bg-emerald-50 text-emerald-800 border border-emerald-200 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider flex items-center space-x-1">
                   <Radio className="w-3 h-3 text-emerald-600 animate-pulse" />
@@ -448,8 +529,7 @@ export default function MultiLaneStopwatchModal({
                 ? 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3'
                 : 'grid-cols-1 sm:grid-cols-2 md:grid-cols-4'
             }`}>
-              {displayedLanes.map((athlete) => {
-                const laneNum = athlete.assignedLane;
+              {lanesArray.map((laneNum) => {
                 const isStopped = laneStatus[laneNum] === 'stopped';
                 const recordedMs = laneTimes[laneNum];
                 const displayTime = isStopped
@@ -459,10 +539,16 @@ export default function MultiLaneStopwatchModal({
                   : '--.-- s';
 
                 const pastelTheme = LANE_PASTEL_THEMES[laneNum] || LANE_PASTEL_THEMES[1];
+                const currentAthleteId = laneAssignments[laneNum] || '';
+                const athlete = candidateAthletes.find(a => a.id === currentAthleteId) || null;
+
+                // Verificar si es el asignado automáticamente por la serie
+                const autoAthlete = (activeHeat.lanes || []).find(a => Number(a.assignedLane) === laneNum) || (activeHeat.lanes || [])[laneNum - 1];
+                const isAutoAssigned = autoAthlete && athlete && autoAthlete.id === athlete.id;
 
                 return (
                   <div
-                    key={athlete.id}
+                    key={laneNum}
                     className={`rounded-2xl border p-3.5 flex flex-col justify-between transition-all shadow-2xs ${
                       isStopped
                         ? 'bg-emerald-50/70 border-emerald-300 ring-2 ring-emerald-200/80'
@@ -480,17 +566,52 @@ export default function MultiLaneStopwatchModal({
                           Carril {laneNum}
                         </span>
                         <span className="text-[11px] font-mono font-bold text-slate-500">
-                          #{athlete.bibNumber || '--'}
+                          #{athlete?.bibNumber || '--'}
                         </span>
                       </div>
 
-                      {/* Datos del Corredor */}
-                      <div className="mb-2">
-                        <h4 className="font-bold text-xs text-slate-900 truncate" title={athlete.fullName}>
-                          {athlete.fullName}
-                        </h4>
-                        <p className="text-[10px] text-slate-500 truncate" title={athlete.schoolName}>
-                          {athlete.schoolName || 'Escuela'}
+                      {/* Selector de Corredor (Automático + Manual) */}
+                      <div className="mb-2 space-y-1">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] font-bold text-slate-600 uppercase tracking-wider flex items-center space-x-1">
+                            <Users className="w-3 h-3 text-slate-400" />
+                            <span>Corredor:</span>
+                          </span>
+                          {athlete ? (
+                            <span className={`text-[9px] font-bold px-1.5 py-0.2 rounded-full border ${
+                              isAutoAssigned
+                                ? 'bg-sky-50 text-sky-700 border-sky-200'
+                                : 'bg-amber-50 text-amber-700 border-amber-200'
+                            }`}>
+                              {isAutoAssigned ? 'Automático' : 'Manual'}
+                            </span>
+                          ) : (
+                            <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-slate-100 text-slate-500 border border-slate-200">
+                              Vacío
+                            </span>
+                          )}
+                        </div>
+
+                        <select
+                          value={currentAthleteId}
+                          disabled={isRaceRunning}
+                          onChange={(e) => handleReassignRunner(laneNum, e.target.value)}
+                          className="w-full bg-white border border-slate-200 hover:border-slate-300 rounded-xl px-2 py-1 text-xs font-semibold text-slate-800 shadow-2xs focus:ring-1 focus:ring-rose-400 focus:border-rose-400 truncate outline-none cursor-pointer disabled:bg-slate-100 disabled:cursor-not-allowed"
+                          title={athlete ? `${athlete.fullName} (${athlete.schoolName || 'Escuela'})` : 'Seleccionar corredor'}
+                        >
+                          <option value="">-- Sin corredor / Vacío --</option>
+                          {candidateAthletes.map(ath => {
+                            const isHeatDefault = autoAthlete?.id === ath.id;
+                            return (
+                              <option key={ath.id} value={ath.id}>
+                                #{ath.bibNumber || '--'} {ath.fullName} {isHeatDefault ? '(Serie)' : ''}
+                              </option>
+                            );
+                          })}
+                        </select>
+
+                        <p className="text-[10px] text-slate-500 truncate px-0.5" title={athlete?.schoolName || 'Escuela'}>
+                          {athlete ? (athlete.schoolName || 'Escuela') : 'Carril sin corredor asignado'}
                         </p>
                       </div>
 
@@ -542,23 +663,46 @@ export default function MultiLaneStopwatchModal({
           ) : (
             /* Vista 2: Modo Juez Individual (Mi Carril) Minimalista Pastel para Celular */
             <div className="max-w-md mx-auto space-y-4">
-              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3 flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-700">Selecciona tu carril asignado:</span>
-                <select
-                  value={selectedSingleLane}
-                  onChange={(e) => setSelectedSingleLane(Number(e.target.value))}
-                  className="bg-white border border-slate-300 rounded-xl px-3 py-1.5 text-xs font-bold text-slate-900 outline-none"
-                >
-                  {displayedLanes.map(ath => (
-                    <option key={ath.id} value={ath.assignedLane}>
-                      Carril {ath.assignedLane} — {ath.fullName}
-                    </option>
-                  ))}
-                </select>
+              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-700">Tu carril asignado:</span>
+                  <select
+                    value={selectedSingleLane}
+                    onChange={(e) => setSelectedSingleLane(Number(e.target.value))}
+                    className="bg-white border border-slate-300 rounded-xl px-3 py-1.5 text-xs font-bold text-slate-900 outline-none"
+                  >
+                    {lanesArray.map(num => {
+                      const ath = candidateAthletes.find(a => a.id === laneAssignments[num]);
+                      return (
+                        <option key={num} value={num}>
+                          Carril {num} {ath ? `— ${ath.fullName}` : '(Vacío)'}
+                        </option>
+                      );
+                    })}
+                  </select>
+                </div>
+
+                {/* Selector de Corredor Manual / Automático para este carril */}
+                <div className="pt-2 border-t border-slate-200 flex items-center justify-between gap-2">
+                  <span className="text-[11px] font-semibold text-slate-600 shrink-0">Corredor:</span>
+                  <select
+                    value={laneAssignments[selectedSingleLane] || ''}
+                    disabled={isRaceRunning}
+                    onChange={(e) => handleReassignRunner(selectedSingleLane, e.target.value)}
+                    className="flex-1 bg-white border border-slate-300 rounded-xl px-2 py-1 text-xs font-medium text-slate-900 outline-none truncate disabled:bg-slate-100"
+                  >
+                    <option value="">-- Sin corredor / Vacío --</option>
+                    {candidateAthletes.map(ath => (
+                      <option key={ath.id} value={ath.id}>
+                        #{ath.bibNumber || '--'} {ath.fullName} ({ath.schoolName || 'Escuela'})
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
-              {singleLaneAthlete && (() => {
-                const laneNum = singleLaneAthlete.assignedLane;
+              {(() => {
+                const laneNum = selectedSingleLane;
                 const isStopped = laneStatus[laneNum] === 'stopped';
                 const recordedMs = laneTimes[laneNum];
                 const displayTime = isStopped
@@ -568,6 +712,7 @@ export default function MultiLaneStopwatchModal({
                   : '--.-- s';
 
                 const pastelTheme = LANE_PASTEL_THEMES[laneNum] || LANE_PASTEL_THEMES[1];
+                const ath = candidateAthletes.find(a => a.id === laneAssignments[laneNum]);
 
                 return (
                   <div className={`border-2 rounded-3xl p-6 text-center space-y-4 shadow-sm transition-all ${
@@ -583,10 +728,10 @@ export default function MultiLaneStopwatchModal({
 
                     <div>
                       <h3 className="font-extrabold text-lg text-slate-900">
-                        {singleLaneAthlete.fullName}
+                        {ath ? ath.fullName : 'Sin Corredor Asignado'}
                       </h3>
                       <p className="text-xs text-slate-500 font-medium">
-                        {singleLaneAthlete.schoolName} • Dorsal #{singleLaneAthlete.bibNumber || '--'}
+                        {ath ? `${ath.schoolName || 'Escuela'} • Dorsal #${ath.bibNumber || '--'}` : 'Selecciona un corredor arriba para asignar este carril'}
                       </p>
                     </div>
 
@@ -634,7 +779,7 @@ export default function MultiLaneStopwatchModal({
           <div className="text-xs text-slate-500">
             <span>Tiempos registrados: </span>
             <strong className="text-slate-900 font-bold">
-              {Object.keys(laneTimes).length} de {displayedLanes.length} carriles
+              {Object.keys(laneTimes).length} de {currentLanesCount} carriles
             </strong>
           </div>
 

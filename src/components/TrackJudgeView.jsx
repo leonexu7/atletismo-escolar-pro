@@ -267,7 +267,7 @@ export default function TrackJudgeView({
   };
 
   // Volcado directo y guardado oficial de tiempos multi-carril a Mesa de Control
-  const handleApplyMultiLaneTimes = (splits) => {
+  const handleApplyMultiLaneTimes = (payload, maybeAssignments) => {
     if (!isAdmin) {
       if (onOpenAdminLogin) onOpenAdminLogin();
       return;
@@ -275,17 +275,28 @@ export default function TrackJudgeView({
     const newLocal = { ...localTimes };
     const updatedEntries = [...currentTrackEntries];
 
-    (activeHeat.lanes || []).forEach(athlete => {
-      const laneNum = athlete.assignedLane;
-      if (splits[laneNum] !== undefined) {
-        const timeVal = splits[laneNum];
+    const splits = payload?.splits || (typeof payload === 'object' && !Array.isArray(payload) ? payload : {});
+    const assignments = payload?.assignments || maybeAssignments || {};
+
+    let appliedCount = 0;
+
+    Object.entries(splits).forEach(([laneStr, timeVal]) => {
+      const laneNum = Number(laneStr);
+      // Buscar atleta asignado manualmente o predeterminado por serie
+      const assignedId = assignments[laneNum];
+      let athlete = assignedId ? eligibleAthletes.find(a => a.id === assignedId) : null;
+      if (!athlete) {
+        athlete = (activeHeat.lanes || []).find(a => Number(a.assignedLane) === laneNum);
+      }
+
+      if (athlete && timeVal !== undefined && timeVal !== null) {
         newLocal[athlete.id] = timeVal;
 
         const existingIdx = updatedEntries.findIndex(e => e.athleteId === athlete.id);
         const newRecord = {
           athleteId: athlete.id,
           heatNumber: activeHeat.heatNumber,
-          laneNumber: athlete.assignedLane,
+          laneNumber: laneNum,
           timeSeconds: timeVal,
           status: 'valid'
         };
@@ -295,11 +306,14 @@ export default function TrackJudgeView({
         } else {
           updatedEntries.push(newRecord);
         }
+        appliedCount++;
       }
     });
 
-    setLocalTimes(newLocal);
-    onSaveTrackResult(activeEvent.id, updatedEntries);
+    if (appliedCount > 0) {
+      setLocalTimes(newLocal);
+      onSaveTrackResult(activeEvent.id, updatedEntries);
+    }
   };
 
   const liveRankings = useMemo(() => {
@@ -374,17 +388,12 @@ export default function TrackJudgeView({
           <div className="w-10 h-10 rounded-2xl bg-rose-50 border border-rose-200 text-rose-600 flex items-center justify-center shrink-0">
             <Flame className="w-5 h-5" />
           </div>
-          <div>
-            <div className="flex items-center space-x-2">
-              <span className="font-bold text-sm text-slate-900">Salida Oficial y Cronometraje Multi-Carril</span>
-              <span className="bg-emerald-50 text-emerald-800 border border-emerald-200 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider flex items-center space-x-1">
-                <Radio className="w-3 h-3 text-emerald-600 animate-pulse" />
-                <span>En Vivo</span>
-              </span>
-            </div>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Pistola del starter desde la arrancada y cronometraje simultáneo en meta ({currentLanesCount} carriles) con cero latencia.
-            </p>
+          <div className="flex items-center space-x-2">
+            <span className="font-bold text-sm text-slate-900">Salida Oficial y Cronometraje Multi-Carril</span>
+            <span className="bg-emerald-50 text-emerald-800 border border-emerald-200 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider flex items-center space-x-1">
+              <Radio className="w-3 h-3 text-emerald-600 animate-pulse" />
+              <span>En Vivo</span>
+            </span>
           </div>
         </div>
 
@@ -399,7 +408,7 @@ export default function TrackJudgeView({
             <span>Pistola / Salida</span>
           </button>
 
-          {/* Botón Cronometraje Multi-Carril en Meta - Ámbar Pastel */}
+          {/* Botón Cronometrista en Meta - Ámbar Pastel */}
           <button
             type="button"
             onClick={() => {
@@ -412,7 +421,7 @@ export default function TrackJudgeView({
             className="px-3.5 py-2 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 text-xs font-bold rounded-xl shadow-2xs transition-all flex items-center space-x-1.5 active:scale-95"
           >
             <Clock className="w-4 h-4 text-amber-600" />
-            <span>Meta Multi-Carril ({currentLanesCount} C)</span>
+            <span>META / Cronometrista</span>
           </button>
         </div>
       </div>
@@ -573,7 +582,7 @@ export default function TrackJudgeView({
             title="Abrir cronómetros de todos los carriles corriendo en vivo"
           >
             <Clock className="w-3.5 h-3.5 text-amber-600" />
-            <span>Multi-Carril ({currentLanesCount}C)</span>
+            <span>META / Cronometrista</span>
           </button>
 
           {/* Botón Juez de Salida Minimalista Pastel */}
@@ -602,8 +611,28 @@ export default function TrackJudgeView({
           </button>
 
           <button
-            onClick={() => generateOfficialTrackSheetPDF(activeEvent, heats, tournament)}
+            onClick={() => {
+              // Combinar marcas guardadas con marcas capturadas en vivo en pantalla
+              const liveHeatEntries = (activeHeat.lanes || []).map(ath => {
+                const rec = currentTrackEntries.find(e => e.athleteId === ath.id);
+                const temp = parseTrackTime(localTimes[ath.id]);
+                const timeSec = temp !== null ? temp : (rec?.timeSeconds || null);
+                return {
+                  athleteId: ath.id,
+                  heatNumber: activeHeat.heatNumber,
+                  laneNumber: ath.assignedLane,
+                  timeSeconds: timeSec,
+                  status: rec?.status || (timeSec ? 'valid' : 'pending'),
+                  statusReason: rec?.statusReason || ''
+                };
+              });
+              const otherEntries = currentTrackEntries.filter(e => !liveHeatEntries.some(l => l.athleteId === e.athleteId));
+              const mergedForPDF = [...otherEntries, ...liveHeatEntries];
+
+              generateOfficialTrackSheetPDF(activeEvent, heats, tournament, mergedForPDF, liveRankings);
+            }}
             className="px-3 py-1.5 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-xl text-xs font-semibold flex items-center space-x-1.5 transition-colors"
+            title="Descargar planilla PDF con los tiempos y lugares oficiales de los corredores"
           >
             <FileText className="w-3.5 h-3.5 text-sky-600" />
             <span>Planilla PDF</span>
@@ -887,6 +916,7 @@ export default function TrackJudgeView({
         onOpenAdminLogin={onOpenAdminLogin}
         roomCode={roomCode}
         activeRaceSession={activeRaceSession}
+        allAthletes={eligibleAthletes}
       />
     </div>
   );

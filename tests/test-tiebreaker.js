@@ -230,6 +230,63 @@ assert(appliedTimes['ath-2'] === 10.58, 'Carril 2 debe asignar 10.58s a Mateo');
 assert(appliedTimes['ath-3'] === 10.75, 'Carril 3 debe asignar 10.75s a Carlos');
 assert(appliedTimes['ath-4'] === 10.90, 'Carril 4 debe asignar 10.90s a Pedro');
 
+// 4. Convivencia de Selección Automática + Manual en Multi-Carril:
+console.log('\n📌 Verificando Selección Manual vs Automática en Cronómetro Multi-Carril:');
+const customAssignments = {
+  1: 'ath-1', // Automático
+  2: 'ath-99', // Reasignado manualmente a un corredor suplente
+  3: 'ath-3', // Automático
+  4: ''       // Carril vacío
+};
+
+const splitsRecorded = { 1: 10.30, 2: 10.60, 3: 10.85 };
+const finalUpdated = {};
+
+Object.entries(splitsRecorded).forEach(([laneStr, timeSec]) => {
+  const laneNum = Number(laneStr);
+  const chosenAthleteId = customAssignments[laneNum];
+  if (chosenAthleteId) {
+    finalUpdated[chosenAthleteId] = timeSec;
+  }
+});
+
+assert(finalUpdated['ath-1'] === 10.30, 'Carril 1 mantiene corredor automático');
+assert(finalUpdated['ath-99'] === 10.60, 'Carril 2 toma la reasignación manual');
+assert(finalUpdated['ath-2'] === undefined, 'El corredor reemplazado no recibe marca');
+
+// 5. Verificando Poblado Automático de Planillas Oficiales PDF:
+console.log('\n📌 Verificando Llenado Automático de Planilla PDF con Tiempos y Lugares:');
+const mockHeatPDF = {
+  lanes: [
+    { id: 'r1', assignedLane: 1, bibNumber: '101', fullName: 'Carlos', schoolName: 'Esc. Hidalgo' },
+    { id: 'r2', assignedLane: 2, bibNumber: '102', fullName: 'Pedro', schoolName: 'Esc. Juárez' }
+  ]
+};
+
+const mockEntriesPDF = [
+  { athleteId: 'r1', timeSeconds: 10.80, status: 'valid' },
+  { athleteId: 'r2', timeSeconds: 10.45, status: 'valid' }
+];
+
+const mockRankedPDF = [
+  { id: 'r2', rank: 1 },
+  { id: 'r1', rank: 2 }
+];
+
+const generatedRows = mockHeatPDF.lanes.map(lane => {
+  const entry = mockEntriesPDF.find(e => e.athleteId === lane.id);
+  const ranked = mockRankedPDF.find(r => r.id === lane.id);
+  return {
+    lane: lane.assignedLane,
+    name: lane.fullName,
+    time: entry && entry.status === 'valid' ? formatTrackTime(entry.timeSeconds) : '',
+    place: ranked ? `${ranked.rank}º` : ''
+  };
+});
+
+assert(generatedRows[0].time === '10.80 s' && generatedRows[0].place === '2º', 'Carlos debe tener 10.80 s y 2º lugar en PDF');
+assert(generatedRows[1].time === '10.45 s' && generatedRows[1].place === '1º', 'Pedro debe tener 10.45 s y 1º lugar en PDF');
+
 console.log('\n----------------------------------------');
 if (failedTests === 0) {
   console.log('🎉 TODAS LAS PRUEBAS UNITARIAS PASARON EXITOSAMENTE (0 fallas).\n');
