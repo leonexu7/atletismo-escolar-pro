@@ -86,7 +86,8 @@ export default function MultiLaneStopwatchModal({
   onOpenAdminLogin,
   roomCode = 'ATLETISMO-2026',
   activeRaceSession = null,
-  allAthletes = []
+  allAthletes = [],
+  isCloudEnabled = true
 }) {
   const [currentLanesCount, setCurrentLanesCount] = useState(lanesCount || 6);
   const [viewMode, setViewMode] = useState('all'); // 'all' | 'single'
@@ -96,6 +97,7 @@ export default function MultiLaneStopwatchModal({
   const [laneStatus, setLaneStatus] = useState({}); // { [assignedLane]: 'running' | 'stopped' }
   const [laneAssignments, setLaneAssignments] = useState({}); // { [laneNumber]: athleteId }
   const [localElapsedMs, setLocalElapsedMs] = useState(0);
+  const [showEmergencyTrigger, setShowEmergencyTrigger] = useState(false);
 
   const startTimestampRef = useRef(null);
   const isRunningRef = useRef(false);
@@ -140,6 +142,7 @@ export default function MultiLaneStopwatchModal({
       setLaneAssignments({});
       setLaneTimes({});
       setLaneStatus({});
+      setShowEmergencyTrigger(false);
       return;
     }
 
@@ -149,6 +152,7 @@ export default function MultiLaneStopwatchModal({
       setLaneAssignments(getDefaultAssignments(activeHeat.lanes, currentLanesCount));
       setLaneTimes({});
       setLaneStatus({});
+      setShowEmergencyTrigger(false);
       return;
     }
 
@@ -312,6 +316,7 @@ export default function MultiLaneStopwatchModal({
     setLocalElapsedMs(0);
     setLaneTimes({});
     setLaneStatus({});
+    setShowEmergencyTrigger(false);
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
   };
 
@@ -380,10 +385,16 @@ export default function MultiLaneStopwatchModal({
                 <h3 className="font-bold text-sm sm:text-base text-slate-900">
                   META / Cronometrista Multi-Carril Sincronizado
                 </h3>
-                <span className="bg-emerald-50 text-emerald-800 border border-emerald-200 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider flex items-center space-x-1">
-                  <Radio className="w-3 h-3 text-emerald-600 animate-pulse" />
-                  <span>Enlace Starter</span>
-                </span>
+                {isCloudEnabled ? (
+                  <span className="bg-emerald-50 text-emerald-800 border border-emerald-200 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider flex items-center space-x-1">
+                    <Radio className="w-3 h-3 text-emerald-600 animate-pulse" />
+                    <span>Enlace Starter (Nube)</span>
+                  </span>
+                ) : (
+                  <span className="bg-slate-100 text-slate-700 border border-slate-300 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider flex items-center space-x-1">
+                    <span>Modo Offline</span>
+                  </span>
+                )}
               </div>
               <p className="text-[11px] text-slate-500">
                 Línea de Meta: {activeEvent?.name || '75m Planos'} • {activeHeat.name || 'Serie 1'}
@@ -438,26 +449,47 @@ export default function MultiLaneStopwatchModal({
                 <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
                 <span>¡CARRERA EN CURSO! Tiempo: {currentSeconds} s</span>
               </span>
-            ) : activeRaceSession?.status === 'marks' ? (
+            ) : isCloudEnabled && activeRaceSession?.status === 'marks' ? (
               <span className="bg-amber-50 text-amber-900 border border-amber-300 px-2.5 py-1 rounded-xl font-bold flex items-center space-x-1.5 animate-pulse">
                 <span className="w-2 h-2 rounded-full bg-amber-500"></span>
                 <span>Starter: ¡A sus marcas!</span>
               </span>
-            ) : activeRaceSession?.status === 'ready' ? (
+            ) : isCloudEnabled && activeRaceSession?.status === 'ready' ? (
               <span className="bg-orange-50 text-orange-950 border border-orange-300 px-2.5 py-1 rounded-xl font-bold flex items-center space-x-1.5 animate-pulse">
                 <span className="w-2 h-2 rounded-full bg-orange-500 animate-ping"></span>
                 <span>Starter: ¡Listos para el disparo!</span>
               </span>
-            ) : activeRaceSession?.status === 'false_start' ? (
+            ) : isCloudEnabled && activeRaceSession?.status === 'false_start' ? (
               <span className="bg-rose-50 text-rose-900 border border-rose-300 px-2.5 py-1 rounded-xl font-bold flex items-center space-x-1.5">
                 <AlertTriangle className="w-3.5 h-3.5 text-rose-600" />
                 <span>Salida en Falso detectada</span>
               </span>
-            ) : (
-              <span className="bg-slate-200/80 text-slate-700 px-2.5 py-1 rounded-xl font-medium flex items-center space-x-1.5">
-                <Clock className="w-3.5 h-3.5 text-slate-500" />
-                <span>Esperando disparo del Juez de Salida...</span>
+            ) : !isCloudEnabled ? (
+              <span className="bg-amber-50 text-amber-900 border border-amber-300 px-2.5 py-1 rounded-xl font-bold flex items-center space-x-1.5">
+                <Zap className="w-3.5 h-3.5 text-amber-600" />
+                <span>Modo Offline: Usa "Disparo Local Meta" para iniciar</span>
               </span>
+            ) : (
+              <div className="flex items-center space-x-2 flex-wrap gap-y-1">
+                <span className="bg-slate-200/80 text-slate-700 px-2.5 py-1 rounded-xl font-medium flex items-center space-x-1.5">
+                  <Clock className="w-3.5 h-3.5 text-slate-500" />
+                  <span>Esperando disparo del Juez de Salida...</span>
+                </span>
+                {!showEmergencyTrigger ? (
+                  <button
+                    type="button"
+                    onClick={() => setShowEmergencyTrigger(true)}
+                    className="text-[10px] text-slate-400 hover:text-slate-600 underline transition-colors"
+                    title="Activar únicamente si el celular del starter se quedó sin pila o falló en pista"
+                  >
+                    ¿Starter sin señal? Respaldo local
+                  </button>
+                ) : (
+                  <span className="text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-lg">
+                    Respaldo manual habilitado
+                  </span>
+                )}
+              </div>
             )}
           </div>
 
@@ -483,17 +515,19 @@ export default function MultiLaneStopwatchModal({
               ))}
             </div>
 
-            {/* Disparo Local en Meta (Respaldo por si no hay señal) */}
+            {/* Disparo Local en Meta: Solo en Modo Offline O si se activó explícitamente el respaldo por falla del Starter */}
             {!isRaceRunning ? (
-              <button
-                type="button"
-                onClick={handleLocalStart}
-                className="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 font-bold rounded-xl text-xs flex items-center space-x-1 shadow-2xs transition-colors"
-                title="Iniciar cronómetros desde meta (Respaldo local si no hay internet)"
-              >
-                <Zap className="w-3.5 h-3.5 text-amber-600" />
-                <span>Disparo Local Meta</span>
-              </button>
+              (!isCloudEnabled || showEmergencyTrigger) && (
+                <button
+                  type="button"
+                  onClick={handleLocalStart}
+                  className="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 font-bold rounded-xl text-xs flex items-center space-x-1 shadow-2xs transition-colors animate-in fade-in"
+                  title={!isCloudEnabled ? "Iniciar cronómetros desde meta (Modo Offline)" : "Iniciar cronómetros desde meta (Respaldo por falla del Starter)"}
+                >
+                  <Zap className="w-3.5 h-3.5 text-amber-600" />
+                  <span>{!isCloudEnabled ? "Disparo Local Meta" : "Disparo Respaldo"}</span>
+                </button>
+              )
             ) : (
               <button
                 type="button"

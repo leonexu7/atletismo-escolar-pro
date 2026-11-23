@@ -314,6 +314,7 @@ export default function App() {
             onOpenAdminLogin={() => setIsAdminLoginOpen(true)}
             roomCode={state.cloudSession?.roomCode || 'ATLETISMO-2026'}
             activeRaceSession={state.activeRaceSession}
+            isCloudEnabled={state.cloudSession?.enabled ?? true}
           />
         )}
 

@@ -39,7 +39,8 @@ export default function TrackJudgeView({
   isAdmin = false,
   onOpenAdminLogin,
   roomCode = 'ATLETISMO-2026',
-  activeRaceSession = null
+  activeRaceSession = null,
+  isCloudEnabled = true
 }) {
   const trackEvents = OFFICIAL_EVENTS.filter(e => isTrackEvent(e.id));
 
@@ -917,6 +918,7 @@ export default function TrackJudgeView({
         roomCode={roomCode}
         activeRaceSession={activeRaceSession}
         allAthletes={eligibleAthletes}
+        isCloudEnabled={isCloudEnabled}
       />
     </div>
   );

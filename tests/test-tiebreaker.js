@@ -287,6 +287,19 @@ const generatedRows = mockHeatPDF.lanes.map(lane => {
 assert(generatedRows[0].time === '10.80 s' && generatedRows[0].place === '2º', 'Carlos debe tener 10.80 s y 2º lugar en PDF');
 assert(generatedRows[1].time === '10.45 s' && generatedRows[1].place === '1º', 'Pedro debe tener 10.45 s y 1º lugar en PDF');
 
+// 6. Visibilidad de Disparo Local Meta en Cronometrista (Online vs Offline):
+console.log('\n📌 Verificando Regla de Visibilidad de Disparo Local Meta (Online vs Offline):');
+const shouldShowLocalButton = (isCloudEnabled, showEmergencyTrigger, isRaceRunning) => {
+  if (isRaceRunning) return false; // En carrera se muestra "Parar Todos", no disparo
+  if (!isCloudEnabled) return true; // En modo Offline SIEMPRE es visible para permitir el arranque local
+  return !!showEmergencyTrigger; // En modo Online se OCULTA por defecto para evitar errores humanos
+};
+
+assert(shouldShowLocalButton(true, false, false) === false, 'En modo Online normal, el botón Disparo Local Meta DEBE ESTAR OCULTO');
+assert(shouldShowLocalButton(false, false, false) === true, 'En modo Offline, el botón Disparo Local Meta DEBE SER VISIBLE');
+assert(shouldShowLocalButton(true, true, false) === true, 'En modo Online con emergencia activada por falla del starter, permite mostrar el botón de respaldo');
+assert(shouldShowLocalButton(false, false, true) === false, 'Durante la carrera no se muestra disparo local');
+
 console.log('\n----------------------------------------');
 if (failedTests === 0) {
   console.log('🎉 TODAS LAS PRUEBAS UNITARIAS PASARON EXITOSAMENTE (0 fallas).\n');
