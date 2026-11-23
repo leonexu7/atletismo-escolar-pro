@@ -638,13 +638,14 @@ export default function TournamentSettingsModal({
 
               <button
                 type="button"
-                onClick={() => {
-                  if (window.confirm('⚠️ ¿Vaciar a CERO todos los datos para iniciar un torneo en blanco?')) {
-                    onResetToZero();
+                onClick={async () => {
+                  if (window.confirm('⚠️ ¿Vaciar a CERO todos los competidores y datos del torneo?\n\nEsta acción borrará de forma definitiva a todos los atletas, escuelas y marcas registradas tanto en este equipo como en la nube de Firebase, manteniendo la sala conectada para iniciar un torneo en blanco.')) {
+                    await onResetToZero();
                     onClose();
                   }
                 }}
                 className="flex-1 py-1.5 px-2 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-xl text-xs font-semibold text-rose-700 transition-colors"
+                title="Borrar todos los competidores localmente y en Firebase"
               >
                 Vaciar a Cero
               </button>

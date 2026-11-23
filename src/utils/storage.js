@@ -3,7 +3,7 @@
  * Almacenamiento seguro offline-first con localStorage y exportación a JSON.
  */
 
-const STORAGE_KEY = 'atletismo_escolar_pro_v1';
+export const STORAGE_KEY = 'atletismo_escolar_pro_v1';
 
 export const DEFAULT_TOURNAMENT_INFO = {
   id: 'juegos-escolares-2026',
@@ -69,7 +69,9 @@ export function loadTournamentState() {
 
 export function saveTournamentState(state) {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    }
     return true;
   } catch (e) {
     console.error('Error guardando estado local:', e);
@@ -109,14 +111,31 @@ export function importTournamentFromFile(file) {
   });
 }
 
-export function purgeAllTournamentData() {
-  localStorage.removeItem(STORAGE_KEY);
-  return {
-    tournament: DEFAULT_TOURNAMENT_INFO,
+export function purgeAllTournamentData(currentCloudSession = null) {
+  if (typeof localStorage !== 'undefined') {
+    localStorage.removeItem(STORAGE_KEY);
+  }
+
+  // Mantener la conexión a la nube activa por defecto (NO desconectar) para sincronizar el vaciado en Firebase
+  const preservedCloud = currentCloudSession ? {
+    ...currentCloudSession,
+    enabled: currentCloudSession.enabled ?? true,
+    userExplicitlyChoseOffline: false
+  } : {
+    enabled: true,
+    userExplicitlyChoseOffline: false,
+    roomCode: 'ATLETISMO-2026'
+  };
+
+  const cleanState = {
+    tournament: { ...DEFAULT_TOURNAMENT_INFO },
     schools: [],
     athletes: [],
     relays: [],
     results: {},
-    cloudSession: { enabled: false, roomCode: 'ATLETISMO-2026' }
+    cloudSession: preservedCloud
   };
+
+  saveTournamentState(cleanState);
+  return cleanState;
 }

@@ -14,7 +14,8 @@ import {
   loadTournamentState,
   saveTournamentState,
   purgeAllTournamentData,
-  DEFAULT_TOURNAMENT_INFO
+  DEFAULT_TOURNAMENT_INFO,
+  STORAGE_KEY
 } from './utils/storage';
 import { DEMO_ATHLETES, DEMO_SCHOOLS, DEMO_INITIAL_RESULTS } from './constants/mockData';
 import { OFFICIAL_EVENTS } from './constants/events';
@@ -22,23 +23,26 @@ import { computeTournamentEventStatus } from './utils/athleticsEngine';
 import {
   subscribeToLiveTournament,
   syncEventUpdateToCloud,
-  syncFullTournamentToCloud
+  syncFullTournamentToCloud,
+  purgeCloudTournamentData
 } from './services/cloudSync';
 
 export default function App() {
   const [state, setState] = useState(() => {
-    const loaded = loadTournamentState();
-    if (!loaded.athletes || loaded.athletes.length === 0) {
-      return {
-        tournament: DEFAULT_TOURNAMENT_INFO,
-        schools: DEMO_SCHOOLS,
-        athletes: DEMO_ATHLETES,
-        relays: [],
-        results: DEMO_INITIAL_RESULTS,
-        cloudSession: { enabled: true, userExplicitlyChoseOffline: false, roomCode: 'ATLETISMO-2026' }
-      };
+    // Si ya existe registro persistido en localStorage (incluso si está en ceros tras vaciar)
+    const raw = typeof localStorage !== 'undefined' ? localStorage.getItem(STORAGE_KEY) : null;
+    if (raw) {
+      return loadTournamentState();
     }
-    return loaded;
+    // Solo en la primera apertura sin datos previos se cargan los datos de demostración
+    return {
+      tournament: DEFAULT_TOURNAMENT_INFO,
+      schools: DEMO_SCHOOLS,
+      athletes: DEMO_ATHLETES,
+      relays: [],
+      results: DEMO_INITIAL_RESULTS,
+      cloudSession: { enabled: true, userExplicitlyChoseOffline: false, roomCode: 'ATLETISMO-2026' }
+    };
   });
 
   // Pestaña inicial: Portal de Maestros (Inscripciones), tal como en el sistema de karate
@@ -66,15 +70,30 @@ export default function App() {
       state.cloudSession.roomCode,
       (cloudData) => {
         if (cloudData && typeof cloudData === 'object') {
-          setState(prev => ({
-            ...prev,
-            results: { ...(prev.results || {}), ...(cloudData.results || {}) },
-            athletes: Array.isArray(cloudData.athletes) && cloudData.athletes.length > 0 ? cloudData.athletes : prev.athletes,
-            schools: Array.isArray(cloudData.schools) && cloudData.schools.length > 0 ? cloudData.schools : prev.schools,
-            relays: Array.isArray(cloudData.relays) ? cloudData.relays : prev.relays,
-            tournament: cloudData.tournament ? { ...prev.tournament, ...cloudData.tournament } : prev.tournament,
-            activeRaceSession: cloudData.activeRaceSession || prev.activeRaceSession
-          }));
+          setState(prev => {
+            // Si en Firebase se ordenó vaciar el torneo a ceros (isPurged)
+            if (cloudData.isPurged) {
+              return {
+                ...prev,
+                athletes: [],
+                schools: [],
+                relays: [],
+                results: {},
+                activeRaceSession: null,
+                tournament: cloudData.tournament ? { ...prev.tournament, ...cloudData.tournament } : prev.tournament
+              };
+            }
+
+            return {
+              ...prev,
+              results: { ...(prev.results || {}), ...(cloudData.results || {}) },
+              athletes: Array.isArray(cloudData.athletes) ? cloudData.athletes : prev.athletes,
+              schools: Array.isArray(cloudData.schools) ? cloudData.schools : prev.schools,
+              relays: Array.isArray(cloudData.relays) ? cloudData.relays : prev.relays,
+              tournament: cloudData.tournament ? { ...prev.tournament, ...cloudData.tournament } : prev.tournament,
+              activeRaceSession: cloudData.activeRaceSession || prev.activeRaceSession
+            };
+          });
         }
       }
     );
@@ -236,9 +255,21 @@ export default function App() {
     pushStateToCloudIfOnline(demo);
   };
 
-  const handleResetToZero = () => {
-    const clean = purgeAllTournamentData();
+  const handleResetToZero = async () => {
+    const currentRoom = state.cloudSession?.roomCode || 'ATLETISMO-2026';
+
+    // 1. Limpiar estado local manteniendo la sala y la nube conectada
+    const clean = purgeAllTournamentData(state.cloudSession);
     setState(clean);
+
+    // 2. Vaciar de forma definitiva en Firebase para que no queden competidores residuales
+    try {
+      await purgeCloudTournamentData(currentRoom, clean.tournament);
+      alert('¡Torneo vaciado a cero! Se borraron todos los competidores, escuelas y marcas tanto en este equipo como en la nube de Firebase, manteniendo la sala activa.');
+    } catch (err) {
+      console.warn('Detalle al sincronizar vaciado con Firebase:', err);
+      alert('¡Datos locales vaciados a cero! (Nota: Se presentó un detalle de red al sincronizar con Firebase: ' + (err.message || 'Error de conexión') + ')');
+    }
   };
 
   const handleSelectEventForPodium = (eventId) => {

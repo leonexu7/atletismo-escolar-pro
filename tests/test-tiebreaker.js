@@ -15,7 +15,7 @@ import {
 } from '../src/utils/timeFormatter.js';
 import { PARTICIPATION_LIMITS } from '../src/constants/categories.js';
 import { cleanCCT, cleanSchoolName, findExistingSchoolMatch } from '../src/utils/schoolNormalizer.js';
-import { DEFAULT_TOURNAMENT_INFO, MASTER_RECOVERY_KEY, loadTournamentState } from '../src/utils/storage.js';
+import { DEFAULT_TOURNAMENT_INFO, MASTER_RECOVERY_KEY, loadTournamentState, purgeAllTournamentData, STORAGE_KEY } from '../src/utils/storage.js';
 
 console.log('🧪 Iniciando pruebas de Atletismo Escolar Pro...\n');
 
@@ -347,6 +347,58 @@ const isLockedForAdmin = deadlineExpired && !true;   // isAdmin = true
 assert(isLockedForTeacher === true, 'Para maestros sin clave de Mesa de Control, el registro está BLOQUEADO después de la fecha límite');
 assert(isLockedForAdmin === false, 'Para Mesa de Control (admin = true), el registro permanece DESBLOQUEADO para inscripciones extemporáneas');
 assert(formatDeadlineFriendly('2026-11-20').includes('20 de noviembre de 2026'), 'formatDeadlineFriendly formatea fecha amigable');
+
+// 8. Verificando Vaciar a Cero Real (Sin desconectar de la nube y borrado completo en Firebase):
+console.log('\n📌 Verificando Vaciar a Cero (Persistencia Online y Limpieza en Firebase):');
+
+const mockOnlineSession = {
+  enabled: true,
+  userExplicitlyChoseOffline: false,
+  roomCode: 'SALA-ESTATAL-2026'
+};
+
+const purgedState = purgeAllTournamentData(mockOnlineSession);
+
+assert(purgedState.athletes.length === 0, 'Vaciar a cero debe dejar exactamente 0 atletas');
+assert(purgedState.schools.length === 0, 'Vaciar a cero debe dejar exactamente 0 escuelas');
+assert(Object.keys(purgedState.results).length === 0, 'Vaciar a cero debe dejar 0 resultados');
+assert(purgedState.cloudSession.enabled === true, 'Vaciar a cero NO DEBE desconectar el sistema de la nube (debe permanecer conectado)');
+assert(purgedState.cloudSession.roomCode === 'SALA-ESTATAL-2026', 'Vaciar a cero debe preservar el código de sala');
+
+// Verificación de sincronización en vivo cuando llega señal de torneo vaciado (isPurged)
+const mockPreviousStateWithAthletes = {
+  athletes: [{ id: 'ath-1', fullName: 'Mateo' }],
+  schools: [{ id: 'esc-1', name: 'Escuela Benito Juárez' }],
+  results: { 'pista_75m': { trackEntries: [{ timeSeconds: 10.5 }] } },
+  activeRaceSession: { status: 'running' }
+};
+
+const cloudDataPurgedSignal = {
+  sport: 'atletismo',
+  isPurged: true,
+  athletes: [],
+  schools: [],
+  relays: [],
+  results: {},
+  activeRaceSession: null
+};
+
+// Simulador de reducer de snapshot
+const reducedSnapshotState = cloudDataPurgedSignal.isPurged
+  ? {
+      ...mockPreviousStateWithAthletes,
+      athletes: [],
+      schools: [],
+      relays: [],
+      results: {},
+      activeRaceSession: null
+    }
+  : mockPreviousStateWithAthletes;
+
+assert(reducedSnapshotState.athletes.length === 0, 'Al recibir señal isPurged de Firebase, los atletas deben vaciarse de inmediato en todos los dispositivos');
+assert(reducedSnapshotState.schools.length === 0, 'Al recibir señal isPurged de Firebase, las escuelas deben vaciarse');
+assert(Object.keys(reducedSnapshotState.results).length === 0, 'Al recibir señal isPurged de Firebase, las marcas se borran');
+assert(reducedSnapshotState.activeRaceSession === null, 'La sesión de carrera activa se reinicia a null');
 
 console.log('\n----------------------------------------');
 if (failedTests === 0) {

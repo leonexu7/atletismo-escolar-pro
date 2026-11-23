@@ -176,11 +176,49 @@ export function syncFullTournamentToCloud(roomCode = 'ATLETISMO-2026', fullState
     athletes: Array.isArray(fullState.athletes) ? fullState.athletes : [],
     relays: Array.isArray(fullState.relays) ? fullState.relays : [],
     results: fullState.results || {},
+    isPurged: false,
     lastSyncTimestamp: new Date().toISOString()
   }, { merge: true }).catch(err => {
     console.error('Error al sincronizar estado completo con la nube:', err);
     return false;
   });
+}
+
+/**
+ * Vacía de manera definitiva todos los competidores, escuelas, marcas/resultados y carreras activas en Firebase.
+ * Utiliza setDoc sin { merge: true } para sobreescribir y erradicar cualquier registro residual en Firestore.
+ */
+export async function purgeCloudTournamentData(roomCode = 'ATLETISMO-2026', tournamentInfo = null) {
+  const db = getFirestoreDB();
+  if (!db) {
+    console.warn('Firestore no inicializado o sin conexión.');
+    return false;
+  }
+
+  const cleanRoom = (roomCode || 'ATLETISMO-2026').trim().toUpperCase();
+  const docRef = doc(db, 'atletismo_tournaments', cleanRoom);
+
+  const cleanPayload = {
+    sport: 'atletismo',
+    appName: 'Atletismo Escolar Pro',
+    tournament: tournamentInfo || {},
+    schools: [],
+    athletes: [],
+    relays: [],
+    results: {},
+    activeRaceSession: null,
+    isPurged: true,
+    purgedAt: new Date().toISOString(),
+    lastSyncTimestamp: new Date().toISOString()
+  };
+
+  try {
+    await setDoc(docRef, cleanPayload);
+    return true;
+  } catch (err) {
+    console.error('Error al vaciar datos del torneo en Firebase:', err);
+    throw err;
+  }
 }
 
 /**
