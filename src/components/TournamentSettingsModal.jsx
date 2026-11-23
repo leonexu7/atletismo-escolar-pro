@@ -349,10 +349,10 @@ export default function TournamentSettingsModal({
               <div className="pr-3">
                 <span className="text-xs font-bold text-slate-800 flex items-center space-x-1.5">
                   <Award className="w-4 h-4 text-amber-500" />
-                  <span>Activar Impresión de Diplomas de Ganadores</span>
+                  <span>Activar Diplomas Individuales Adicionales</span>
                 </span>
                 <span className="text-[11px] text-slate-500 block mt-0.5">
-                  Por defecto está desactivada para simplificar la interfaz. Actívala si necesitas generar e imprimir diplomas oficiales en PDF para los medallistas.
+                  Las Hojas de Premiación de Lugares ya están disponibles en los resultados. Activa esta casilla si adicionalmente requieres generar diplomas individuales por alumno.
                 </span>
               </div>
               <input

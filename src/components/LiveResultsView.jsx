@@ -9,12 +9,16 @@ import {
   Users,
   ChevronRight,
   Flame,
-  CheckCircle
+  CheckCircle,
+  Download,
+  Eye,
+  FileText
 } from 'lucide-react';
 import { OFFICIAL_EVENTS, isFieldEvent } from '../constants/events';
 import { formatTrackTime, formatFieldDistance } from '../utils/timeFormatter';
 import { evaluateFieldAttempts, rankFieldEventCompetitors, rankTrackEventRunners } from '../utils/tieBreaker';
-import { generateAwardsDiplomasPDF } from '../utils/pdfGenerator';
+import { generateAwardsDiplomasPDF, generateAwardPresentationSheetPDF } from '../utils/pdfGenerator';
+import AwardPresentationSheetModal from './AwardPresentationSheetModal';
 
 export default function LiveResultsView({
   tournament,
@@ -25,6 +29,7 @@ export default function LiveResultsView({
 }) {
   const [selectedEventId, setSelectedEventId] = useState(initialEventId);
   const [selectedGender, setSelectedGender] = useState('M');
+  const [isAwardSheetOpen, setIsAwardSheetOpen] = useState(false);
 
   const activeEvent = OFFICIAL_EVENTS.find(e => e.id === selectedEventId) || OFFICIAL_EVENTS[0];
   const isField = isFieldEvent(activeEvent.id);
@@ -89,13 +94,14 @@ export default function LiveResultsView({
     });
   };
 
-  const handlePrintDiplomas = () => {
-    const winners = rankedList.slice(0, 3).filter(w => isField ? w.hasValidMark : (w.status === 'valid' && w.timeSeconds));
-    if (winners.length === 0) {
-      alert('Aún no hay atletas premiados con marcas oficiales registradas.');
+  const handleDownloadAwardSheetPDF = () => {
+    const hasAnyResult = rankedList.some(w => isField ? w.hasValidMark : (w.status === 'valid' && w.timeSeconds));
+    if (!hasAnyResult) {
+      alert('Aún no hay atletas premiados con marcas oficiales registradas en esta prueba.');
       return;
     }
-    generateAwardsDiplomasPDF(winners, activeEvent, tournament);
+    const genderLabel = activeEvent.id.includes('mixto') ? 'Mixto' : selectedGender === 'F' ? 'Femenil' : 'Varonil';
+    generateAwardPresentationSheetPDF(rankedList, activeEvent, tournament, genderLabel);
   };
 
   return (
@@ -276,18 +282,28 @@ export default function LiveResultsView({
           </div>
         </div>
 
-        {/* Botón Diplomas (Condicionado por Ajustes: tournament?.enableDiplomas) */}
-        {tournament?.enableDiplomas && (
-          <div className="mt-6 flex justify-center">
-            <button
-              onClick={handlePrintDiplomas}
-              className="px-5 py-2.5 bg-rose-500 hover:bg-rose-600 text-white font-bold text-xs rounded-xl shadow-xs flex items-center space-x-1.5 transition-colors"
-            >
-              <Printer className="w-4 h-4" />
-              <span>Imprimir Diplomas Oficiales en PDF</span>
-            </button>
-          </div>
-        )}
+        {/* Acciones Oficiales de Hoja de Premiación de Lugares */}
+        <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+          <button
+            type="button"
+            onClick={() => setIsAwardSheetOpen(true)}
+            className="px-4 py-2.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 font-bold text-xs rounded-xl shadow-2xs flex items-center space-x-2 transition-all active:scale-95"
+            title="Ver la hoja estética de presentación oficial de premiación con el podio"
+          >
+            <Trophy className="w-4 h-4 text-amber-600" />
+            <span>Ver Hoja de Premiación Oficial</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={handleDownloadAwardSheetPDF}
+            className="px-4 py-2.5 bg-rose-500 hover:bg-rose-600 text-white font-bold text-xs rounded-xl shadow-2xs flex items-center space-x-2 transition-all active:scale-95"
+            title="Descargar la cédula técnica y hoja de premiación en PDF listo para firmar"
+          >
+            <Download className="w-4 h-4" />
+            <span>Descargar Hoja en PDF</span>
+          </button>
+        </div>
       </div>
 
       {/* Tabla Completa de Posiciones */}
@@ -371,6 +387,16 @@ export default function LiveResultsView({
           </table>
         </div>
       </div>
+
+      {/* Modal de Hoja de Presentación Oficial de Premiación */}
+      <AwardPresentationSheetModal
+        isOpen={isAwardSheetOpen}
+        onClose={() => setIsAwardSheetOpen(false)}
+        event={activeEvent}
+        gender={selectedGender}
+        tournament={tournament}
+        rankedList={rankedList}
+      />
     </div>
   );
 }

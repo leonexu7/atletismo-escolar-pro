@@ -14,11 +14,12 @@ import {
   ArrowLeft,
   ChevronRight,
   Filter,
-  Check
+  Check,
+  Download
 } from 'lucide-react';
 import { OFFICIAL_EVENTS, isFieldEvent, isTrackEvent } from '../constants/events';
 import { computeTournamentEventStatus } from '../utils/athleticsEngine';
-import { generateAwardsDiplomasPDF } from '../utils/pdfGenerator';
+import { generateAwardPresentationSheetPDF } from '../utils/pdfGenerator';
 import { evaluateFieldAttempts, rankFieldEventCompetitors, rankTrackEventRunners } from '../utils/tieBreaker';
 
 export default function ControlDeskView({
@@ -76,13 +77,46 @@ export default function ControlDeskView({
     }
   };
 
-  const handlePrintDiplomas = (ev) => {
-    const winners = getEventWinners(ev.id);
-    if (!winners || winners.length === 0) {
-      alert('Aún no hay atletas con marcas registradas para emitir diplomas en esta prueba.');
+  const handlePrintAwardSheet = (ev) => {
+    const isField = isFieldEvent(ev.id);
+    const eventResults = results[ev.id] || {};
+    const enrolledAthletes = athletes.filter(a => (a.eventIds || []).includes(ev.id)).map(a => {
+      const school = schools.find(s => s.id === a.schoolId);
+      return {
+        ...a,
+        schoolName: school?.name || 'Escuela Primaria'
+      };
+    });
+
+    let ranked = [];
+    if (isField) {
+      const fieldData = eventResults.fieldEntries || [];
+      const evaluated = enrolledAthletes.map(ath => {
+        const found = fieldData.find(e => e.athleteId === ath.id);
+        const attempts = found?.attempts || [];
+        const tech = evaluateFieldAttempts(attempts);
+        return { ...ath, ...tech };
+      });
+      ranked = rankFieldEventCompetitors(evaluated);
+    } else {
+      const trackData = eventResults.trackEntries || [];
+      const evaluated = enrolledAthletes.map(ath => {
+        const found = trackData.find(e => e.athleteId === ath.id);
+        return {
+          ...ath,
+          timeSeconds: found?.timeSeconds || null,
+          status: found?.status || (found?.timeSeconds ? 'valid' : 'pending'),
+          statusReason: found?.statusReason || ''
+        };
+      });
+      ranked = rankTrackEventRunners(evaluated);
+    }
+
+    if (!ranked || ranked.length === 0) {
+      alert('Aún no hay atletas registrados en esta prueba.');
       return;
     }
-    generateAwardsDiplomasPDF(winners, ev, tournament);
+    generateAwardPresentationSheetPDF(ranked, ev, tournament, ev.id.includes('mixto') ? 'Mixto' : 'Oficial');
   };
 
   const filteredEvents = eventStatusList.filter(item => {
@@ -297,14 +331,14 @@ export default function ControlDeskView({
                     <span>Ver Podio</span>
                   </button>
 
-                  {tournament?.enableDiplomas && (
+                  {(isCompleted || isAwarded) && (
                     <button
-                      onClick={() => handlePrintDiplomas(ev)}
-                      title="Imprimir Diplomas Oficiales en PDF"
-                      className="py-1.5 px-3 bg-rose-500 hover:bg-rose-600 text-white rounded-xl text-xs font-bold transition-colors shadow-2xs flex items-center space-x-1"
+                      onClick={() => handlePrintAwardSheet(ev)}
+                      title="Descargar Hoja Oficial de Premiación de Lugares en PDF"
+                      className="py-1.5 px-2.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 rounded-xl text-xs font-bold transition-colors shadow-2xs flex items-center space-x-1"
                     >
-                      <Printer className="w-3.5 h-3.5" />
-                      <span>Diplomas</span>
+                      <Download className="w-3.5 h-3.5 text-amber-600" />
+                      <span>Premiación</span>
                     </button>
                   )}
 
