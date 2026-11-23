@@ -5,8 +5,8 @@
  * - Agregador de progreso en vivo para la Mesa de Control
  */
 
-import { OFFICIAL_EVENTS, isFieldEvent, isTrackEvent } from '../constants/events';
-import { evaluateFieldAttempts, rankFieldEventCompetitors, rankTrackEventRunners } from './tieBreaker';
+import { OFFICIAL_EVENTS, isFieldEvent, isTrackEvent } from '../constants/events.js';
+import { evaluateFieldAttempts, rankFieldEventCompetitors, rankTrackEventRunners } from './tieBreaker.js';
 
 /**
  * Distribuye corredores en series (heats) y asigna carriles (1 a 8)

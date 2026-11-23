@@ -164,10 +164,10 @@ export function rankTrackEventRunners(runners = []) {
 
   for (let i = 0; i < validRunners.length; i++) {
     const current = validRunners[i];
-    const prev = validRunners[i - 1];
+    const prev = ranked[i - 1];
 
     if (prev && Math.abs(prev.timeSeconds - current.timeSeconds) < 0.005) {
-      // Mismo tiempo a la centésima: comparten lugar
+      // Mismo tiempo a la centésima: comparten lugar oficial
       ranked.push({
         ...current,
         rank: prev.rank,

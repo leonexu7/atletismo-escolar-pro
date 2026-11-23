@@ -175,9 +175,10 @@ export default function TeacherRegistrationView({
       ? 'primaria_abierta'
       : (athleteForm.schoolGrade === '3' || athleteForm.schoolGrade === '4' ? 'infantil_menor' : 'infantil_mayor');
 
+    const maxExistingBib = athletes.reduce((max, a) => Math.max(max, parseInt(a.bibNumber, 10) || 0), 100);
     const assignedBib = athleteForm.bibNumber
       ? parseInt(athleteForm.bibNumber, 10)
-      : Math.floor(100 + athletes.length + 1);
+      : maxExistingBib + 1;
 
     const newAthlete = {
       id: `ath-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
@@ -272,11 +273,12 @@ export default function TeacherRegistrationView({
         return;
       }
 
+      const maxExistingBib = athletes.reduce((max, a) => Math.max(max, parseInt(a.bibNumber, 10) || 0), 100);
       const formatted = parsedList.map((p, idx) => ({
         ...p,
         schoolId: schoolInfo.id,
         schoolName: schoolInfo.name,
-        bibNumber: p.bibNumber || (100 + athletes.length + idx + 1)
+        bibNumber: p.bibNumber || (maxExistingBib + idx + 1)
       }));
 
       onRegisterBatchAthletes(formatted);
