@@ -301,8 +301,7 @@ export default function ControlDeskView({
                     </span>
                   </div>
 
-                  <h4 className="text-sm font-bold text-slate-900 mb-0.5">{ev.name}</h4>
-                  <p className="text-[11px] text-slate-500 mb-3">{ev.description || ev.spec}</p>
+                  <h4 className="text-sm font-bold text-slate-900 mb-2">{ev.name}</h4>
 
                   {/* Barra de Progreso */}
                   <div className="space-y-1 mb-3">

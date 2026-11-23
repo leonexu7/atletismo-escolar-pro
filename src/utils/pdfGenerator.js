@@ -101,16 +101,16 @@ export function generateOfficialTrackSheetPDF(
         head: [['Carril', 'Dorsal', 'Nombre del Alumno / Corredor', 'Escuela de Procedencia', 'Tiempo Oficial', 'Lugar', 'Notas / Faltas']],
         body: tableBody,
         theme: 'grid',
-        styles: { fontSize: 9, cellPadding: 2.5 },
-        headStyles: { fillColor: [30, 41, 59], textColor: [255, 255, 255], fontStyle: 'bold' },
+        styles: { fontSize: 8.5, cellPadding: 2 },
+        headStyles: { fillColor: [30, 41, 59], textColor: [255, 255, 255], fontStyle: 'bold', halign: 'center' },
         columnStyles: {
-          0: { cellWidth: 16, halign: 'center' },
-          1: { cellWidth: 18, halign: 'center' },
-          2: { cellWidth: 80 },
-          3: { cellWidth: 70 },
-          4: { cellWidth: 30, halign: 'center', fontStyle: 'bold' },
-          5: { cellWidth: 18, halign: 'center', fontStyle: 'bold' },
-          6: { cellWidth: 28 }
+          0: { cellWidth: 14, halign: 'center' },
+          1: { cellWidth: 16, halign: 'center', fontStyle: 'bold' },
+          2: { cellWidth: 68 },
+          3: { cellWidth: 58 },
+          4: { cellWidth: 28, halign: 'center', fontStyle: 'bold' },
+          5: { cellWidth: 16, halign: 'center', fontStyle: 'bold' },
+          6: { cellWidth: 46 }
         },
         margin: { left: 14, right: 14 }
       });
@@ -130,16 +130,19 @@ export function generateOfficialTrackSheetPDF(
     doc.addPage();
     footY = 175;
   }
+  const signWidth = 65;
+  const leftSignCenter = 65;
+  const rightSignCenter = pageWidth - 65;
   doc.setDrawColor(148, 163, 184);
   doc.setLineWidth(0.3);
-  doc.line(30, footY, 90, footY);
-  doc.line(180, footY, 240, footY);
+  doc.line(leftSignCenter - signWidth / 2, footY, leftSignCenter + signWidth / 2, footY);
+  doc.line(rightSignCenter - signWidth / 2, footY, rightSignCenter + signWidth / 2, footY);
 
   doc.setFontSize(8);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(71, 85, 105);
-  doc.text('Juez de Salida / Cronometrador', 60, footY + 4, { align: 'center' });
-  doc.text('Juez Árbitro de Pista', 210, footY + 4, { align: 'center' });
+  doc.text('Juez de Salida / Cronometrador', leftSignCenter, footY + 4, { align: 'center' });
+  doc.text('Juez Árbitro de Pista', rightSignCenter, footY + 4, { align: 'center' });
 
   doc.save(`Planilla_Pista_${event.shortName || 'carrera'}.pdf`);
 }
@@ -237,18 +240,18 @@ export function generateOfficialFieldSheetPDF(
     ]],
     body: tableBody,
     theme: 'grid',
-    styles: { fontSize: 8.5, cellPadding: 2.5 },
-    headStyles: { fillColor: [4, 120, 87], textColor: [255, 255, 255], fontStyle: 'bold' },
+    styles: { fontSize: 8, cellPadding: 2, overflow: 'linebreak' },
+    headStyles: { fillColor: [4, 120, 87], textColor: [255, 255, 255], fontStyle: 'bold', halign: 'center' },
     columnStyles: {
-      0: { cellWidth: 14, halign: 'center' },
-      1: { cellWidth: 16, halign: 'center' },
-      2: { cellWidth: 70 },
-      3: { cellWidth: 55 },
-      4: { cellWidth: 20, halign: 'center' },
-      5: { cellWidth: 20, halign: 'center' },
-      6: { cellWidth: 20, halign: 'center' },
-      7: { cellWidth: 26, halign: 'center', fontStyle: 'bold' },
-      8: { cellWidth: 20, halign: 'center' },
+      0: { cellWidth: 12, halign: 'center' },
+      1: { cellWidth: 14, halign: 'center', fontStyle: 'bold' },
+      2: { cellWidth: 58 },
+      3: { cellWidth: 50 },
+      4: { cellWidth: 18, halign: 'center' },
+      5: { cellWidth: 18, halign: 'center' },
+      6: { cellWidth: 18, halign: 'center' },
+      7: { cellWidth: 23, halign: 'center', fontStyle: 'bold' },
+      8: { cellWidth: 19, halign: 'center' },
       9: { cellWidth: 16, halign: 'center', fontStyle: 'bold' }
     },
     margin: { left: 14, right: 14 }
@@ -261,16 +264,19 @@ export function generateOfficialFieldSheetPDF(
     doc.addPage();
     footY = 175;
   }
+  const signWidth = 65;
+  const leftSignCenter = 65;
+  const rightSignCenter = pageWidth - 65;
   doc.setDrawColor(148, 163, 184);
   doc.setLineWidth(0.3);
-  doc.line(30, footY, 90, footY);
-  doc.line(180, footY, 240, footY);
+  doc.line(leftSignCenter - signWidth / 2, footY, leftSignCenter + signWidth / 2, footY);
+  doc.line(rightSignCenter - signWidth / 2, footY, rightSignCenter + signWidth / 2, footY);
 
   doc.setFontSize(8);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(71, 85, 105);
-  doc.text('Juez Jefe de Prueba de Campo', 60, footY + 4, { align: 'center' });
-  doc.text('Juez Árbitro General', 210, footY + 4, { align: 'center' });
+  doc.text('Juez Jefe de Prueba de Campo', leftSignCenter, footY + 4, { align: 'center' });
+  doc.text('Juez Árbitro General', rightSignCenter, footY + 4, { align: 'center' });
 
   doc.save(`Planilla_Campo_${event.shortName || 'concurso'}.pdf`);
 }
@@ -457,9 +463,9 @@ export function generateAwardPresentationSheetPDF(rankedList = [], event = {}, t
       headStyles: { fillColor: [51, 65, 85], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 7.5 },
       columnStyles: {
         0: { cellWidth: 16, halign: 'center', fontStyle: 'bold' },
-        1: { cellWidth: 18, halign: 'center' },
-        2: { cellWidth: 95, fontStyle: 'bold' },
-        3: { cellWidth: 85 },
+        1: { cellWidth: 16, halign: 'center' },
+        2: { cellWidth: 90, fontStyle: 'bold' },
+        3: { cellWidth: 78 },
         4: { cellWidth: 35, halign: 'center', fontStyle: 'bold' }
       },
       margin: { left: 14, right: 14 }
@@ -637,19 +643,20 @@ export function generateMasterAthletesRosterPDF(athletes = [], schools = [], tou
     head: [['#', 'Dorsal', 'Nombre Completo del Atleta', 'Rama', 'Grado', 'Escuela Primaria', 'Pruebas Inscritas', 'Cotejo']],
     body: tableBody,
     theme: 'grid',
-    styles: { fontSize: 8, cellPadding: 2, textColor: [15, 23, 42] },
-    headStyles: { fillColor: [30, 41, 59], textColor: [255, 255, 255], fontStyle: 'bold' },
+    styles: { fontSize: 8, cellPadding: 2, textColor: [15, 23, 42], overflow: 'linebreak' },
+    headStyles: { fillColor: [30, 41, 59], textColor: [255, 255, 255], fontStyle: 'bold', halign: 'center' },
     alternateRowStyles: { fillColor: [248, 250, 252] },
     columnStyles: {
       0: { cellWidth: 10, halign: 'center' },
-      1: { cellWidth: 16, halign: 'center', fontStyle: 'bold' },
+      1: { cellWidth: 15, halign: 'center', fontStyle: 'bold' },
       2: { cellWidth: 55, fontStyle: 'bold' },
       3: { cellWidth: 14, halign: 'center' },
       4: { cellWidth: 14, halign: 'center' },
-      5: { cellWidth: 45 },
-      6: { cellWidth: 70 },
-      7: { cellWidth: 20 }
-    }
+      5: { cellWidth: 46 },
+      6: { cellWidth: 68 },
+      7: { cellWidth: 20, halign: 'center' }
+    },
+    margin: { left: 14, right: 14 }
   });
 
   doc.save(`Padron_Oficial_Atletas_${Date.now()}.pdf`);

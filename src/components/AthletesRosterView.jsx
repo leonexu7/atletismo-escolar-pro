@@ -742,16 +742,13 @@ export default function AthletesRosterView({
                         type="button"
                         key={ev.id}
                         onClick={() => toggleEditEvent(ev.id)}
-                        className={`p-2 rounded-lg text-left border transition-all text-[11px] ${
+                        className={`p-2.5 rounded-lg text-center border transition-all text-xs font-semibold ${
                           isSelected
-                            ? 'bg-indigo-600 border-indigo-700 text-white font-bold'
-                            : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100'
+                            ? 'bg-indigo-600 border-indigo-700 text-white font-bold shadow-xs'
+                            : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
                         }`}
                       >
-                        <div className="font-semibold">{ev.name}</div>
-                        <div className={`text-[10px] ${isSelected ? 'text-indigo-200' : 'text-slate-400'}`}>
-                          {ev.spec}
-                        </div>
+                        <div>{ev.name}</div>
                       </button>
                     );
                   })}
