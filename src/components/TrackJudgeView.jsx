@@ -548,8 +548,8 @@ export default function TrackJudgeView({
 
       {/* Selector de Serie y Acciones */}
       <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-white border border-slate-200/90 rounded-2xl p-3.5 shadow-xs">
-        <div className="flex items-center space-x-2 overflow-x-auto w-full sm:w-auto">
-          <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Series:</span>
+        <div className="flex items-center space-x-2 overflow-x-auto w-full sm:w-auto pb-1 scrollbar-thin">
+          <span className="text-xs font-bold text-slate-500 uppercase tracking-wider shrink-0">Series:</span>
           {heats.length === 0 ? (
             <span className="text-xs text-slate-400 italic">Sin corredores inscritos</span>
           ) : (
@@ -557,13 +557,14 @@ export default function TrackJudgeView({
               <button
                 key={heat.heatNumber}
                 onClick={() => setSelectedHeatIndex(idx)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                title={heat.name}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap shrink-0 transition-all ${
                   selectedHeatIndex === idx
                     ? 'bg-rose-500 text-white shadow-xs'
                     : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                 }`}
               >
-                {heat.name}
+                {heats.length > 4 ? `Serie ${heat.heatNumber}` : heat.name}
               </button>
             ))
           )}

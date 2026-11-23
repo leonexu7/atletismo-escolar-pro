@@ -28,6 +28,7 @@ export default function TournamentSettingsModal({
   tournament,
   onSaveTournament,
   onLoadDemoData,
+  onLoadLargeSimulation,
   onResetToZero,
   fullState,
   isAdmin = false
@@ -622,18 +623,33 @@ export default function TournamentSettingsModal({
               />
             </div>
 
-            <div className="flex space-x-2 pt-1">
+            <div className="grid grid-cols-3 gap-2 pt-1">
               <button
                 type="button"
                 onClick={() => {
-                  if (window.confirm('¿Cargar datos de prueba?')) {
+                  if (window.confirm('¿Cargar datos de prueba rápidos (12 atletas)?')) {
                     onLoadDemoData();
                     onClose();
                   }
                 }}
-                className="flex-1 py-1.5 px-2 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-xl text-xs font-semibold text-amber-800 transition-colors"
+                className="py-1.5 px-1.5 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-xl text-xs font-semibold text-amber-800 transition-colors text-center truncate"
+                title="Carga 12 atletas de demostración"
               >
-                Cargar Demo
+                Demo (12)
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  if (window.confirm('¿Simular torneo masivo a gran escala con 160 atletas y 10 escuelas?\n\nEsto cargará 160 alumnos con series de 6 y 8 carriles, hojas de campo y resultados en vivo para evaluar el sistema bajo alto estrés.')) {
+                    if (onLoadLargeSimulation) onLoadLargeSimulation();
+                    onClose();
+                  }
+                }}
+                className="py-1.5 px-1.5 bg-sky-50 hover:bg-sky-100 border border-sky-200 rounded-xl text-xs font-bold text-sky-800 transition-colors text-center truncate"
+                title="Simula un torneo completo con 160 atletas y 10 escuelas"
+              >
+                Simular 160
               </button>
 
               <button
@@ -644,7 +660,7 @@ export default function TournamentSettingsModal({
                     onClose();
                   }
                 }}
-                className="flex-1 py-1.5 px-2 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-xl text-xs font-semibold text-rose-700 transition-colors"
+                className="py-1.5 px-1.5 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-xl text-xs font-semibold text-rose-700 transition-colors text-center truncate"
                 title="Borrar todos los competidores localmente y en Firebase"
               >
                 Vaciar a Cero

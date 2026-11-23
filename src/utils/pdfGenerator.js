@@ -123,8 +123,13 @@ export function generateOfficialTrackSheetPDF(
     });
   }
 
-  // Cuadro de firmas reglamentarias
-  const footY = 190;
+  // Cuadro de firmas reglamentarias con protección contra desbordamiento en hojas múltiples
+  const lastTableY = doc.lastAutoTable ? doc.lastAutoTable.finalY : currentY;
+  let footY = Math.max(lastTableY + 12, 182);
+  if (footY > 192) {
+    doc.addPage();
+    footY = 175;
+  }
   doc.setDrawColor(148, 163, 184);
   doc.setLineWidth(0.3);
   doc.line(30, footY, 90, footY);
@@ -249,8 +254,13 @@ export function generateOfficialFieldSheetPDF(
     margin: { left: 14, right: 14 }
   });
 
-  // Firmas
-  const footY = 190;
+  // Firmas con protección contra desbordamiento en hojas múltiples
+  const lastFieldTableY = doc.lastAutoTable ? doc.lastAutoTable.finalY : 34;
+  let footY = Math.max(lastFieldTableY + 12, 182);
+  if (footY > 192) {
+    doc.addPage();
+    footY = 175;
+  }
   doc.setDrawColor(148, 163, 184);
   doc.setLineWidth(0.3);
   doc.line(30, footY, 90, footY);
@@ -284,8 +294,8 @@ export function generateAwardsDiplomasPDF(winners = [], event = {}, tournamentIn
   winners.slice(0, 3).forEach((winner, idx) => {
     if (idx > 0) doc.addPage();
 
-    const place = idx + 1;
-    const config = medalConfig[place] || medalConfig[1];
+    const place = (typeof winner.rank === 'number' && winner.rank >= 1 && winner.rank <= 3) ? winner.rank : (idx + 1);
+    const config = medalConfig[place] || medalConfig[idx + 1] || medalConfig[1];
 
     // Marco exterior ceremonial
     doc.setDrawColor(config.color[0], config.color[1], config.color[2]);

@@ -238,3 +238,116 @@ export const DEMO_INITIAL_RESULTS = {
     ]
   }
 };
+
+/**
+ * Generador masivo de 160 Atletas oficiales y 10 Escuelas Primarias
+ * para pruebas de estrés a gran escala y validación integral.
+ */
+export function generateLargeStressTournamentData() {
+  const schools = [
+    { id: 'esc-1', name: 'Escuela Primaria Federal Benito Juárez', shortName: 'Benito Juárez', cct: '21EPR0101A', zone: 'Zona Escolar 04', inspection: 'Inspección 12', coachName: 'Prof. Roberto González' },
+    { id: 'esc-2', name: 'Primaria Urbana Emiliano Zapata', shortName: 'Zapata', cct: '21EPR0202B', zone: 'Zona Escolar 04', inspection: 'Inspección 12', coachName: 'Profra. Marcela Mendoza' },
+    { id: 'esc-3', name: 'Centro Escolar Niños Héroes de Chapultepec', shortName: 'CENHCH', cct: '21EPR0303C', zone: 'Zona Escolar 08', inspection: 'Inspección 14', coachName: 'Prof. Carlos Salgado' },
+    { id: 'esc-4', name: 'Escuela Primaria Miguel Hidalgo y Costilla', shortName: 'Hidalgo', cct: '21EPR0404D', zone: 'Zona Escolar 08', inspection: 'Inspección 14', coachName: 'Profra. Laura Domínguez' },
+    { id: 'esc-5', name: 'Primaria Rural Lázaro Cárdenas del Río', shortName: 'Lázaro Cárdenas', cct: '21EPR0505E', zone: 'Zona Escolar 11', inspection: 'Inspección 03', coachName: 'Prof. Javier Castillo' },
+    { id: 'esc-6', name: 'Instituto Escolar Josefa Ortiz de Domínguez', shortName: 'Josefa Ortiz', cct: '21EPR0606F', zone: 'Zona Escolar 11', inspection: 'Inspección 03', coachName: 'Profra. Gabriela Soto' },
+    { id: 'esc-7', name: 'Colegio Primario Morelos de Puebla', shortName: 'Morelos', cct: '21EPR0707G', zone: 'Zona Escolar 15', inspection: 'Inspección 07', coachName: 'Prof. Fernando Morales' },
+    { id: 'esc-8', name: 'Primaria Venustiano Carranza', shortName: 'Carranza', cct: '21EPR0808H', zone: 'Zona Escolar 15', inspection: 'Inspección 07', coachName: 'Profra. Patricia Reyes' },
+    { id: 'esc-9', name: 'Escuela Primaria Francisco I. Madero', shortName: 'Madero', cct: '21EPR0909I', zone: 'Zona Escolar 20', inspection: 'Inspección 09', coachName: 'Prof. Armando Vega' },
+    { id: 'esc-10', name: 'Centro Educativo Cuauhtémoc', shortName: 'Cuauhtémoc', cct: '21EPR1010J', zone: 'Zona Escolar 20', inspection: 'Inspección 09', coachName: 'Profra. Silvia Fuentes' }
+  ];
+
+  const firstNamesM = ['Santiago', 'Mateo', 'Sebastián', 'Leonardo', 'Emiliano', 'Diego', 'Daniel', 'Alexander', 'David', 'Gabriel', 'Bruno', 'Eduardo', 'Rodrigo', 'Javier', 'Carlos', 'Ángel'];
+  const firstNamesF = ['Sofía', 'Valentina', 'Regina', 'Camila', 'Valeria', 'Ximena', 'Victoria', 'Lucía', 'Natalia', 'Renata', 'Daniela', 'Mariana', 'Fernanda', 'Andrea', 'Elena', 'Paola'];
+  const lastNames = ['Hernández', 'García', 'Martínez', 'López', 'González', 'Pérez', 'Rodríguez', 'Sánchez', 'Ramírez', 'Cruz', 'Flores', 'Gómez', 'Morales', 'Vázquez', 'Reyes', 'Jiménez'];
+
+  const athletes = [];
+  let bib = 101;
+
+  schools.forEach((school, sIdx) => {
+    for (let i = 0; i < 16; i++) {
+      const isMale = i % 2 === 0;
+      const gender = isMale ? 'M' : 'F';
+      const fnList = isMale ? firstNamesM : firstNamesF;
+      const firstName = fnList[i % fnList.length];
+      const lastName = lastNames[(sIdx * 3 + i) % lastNames.length];
+      const birthYear = 2014 + (i % 3);
+      const birthMonth = String((i % 12) + 1).padStart(2, '0');
+      const birthDay = String((i % 28) + 1).padStart(2, '0');
+      const grade = 3 + (i % 4);
+
+      let trackEventId;
+      if (i < 4) trackEventId = 'pista_75m';
+      else if (i < 8) trackEventId = 'pista_150m';
+      else if (i < 12) trackEventId = 'pista_300m';
+      else trackEventId = 'pista_600m';
+
+      let fieldEventId;
+      if (i % 4 === 0) fieldEventId = 'campo_longitud';
+      else if (i % 4 === 1) fieldEventId = 'campo_bala';
+      else if (i % 4 === 2) fieldEventId = 'campo_disco';
+      else fieldEventId = 'campo_pelota';
+
+      athletes.push({
+        id: `ath-sim-${sIdx + 1}-${i + 1}`,
+        bibNumber: bib++,
+        fullName: `${firstName} ${lastName}`,
+        gender,
+        schoolGrade: String(grade),
+        birthDate: `${birthYear}-${birthMonth}-${birthDay}`,
+        schoolId: school.id,
+        schoolName: school.name,
+        categoryId: 'infantil_mayor',
+        eventIds: [trackEventId, fieldEventId]
+      });
+    }
+  });
+
+  // Tiempos para 75m Planos (40 corredores)
+  const runners75m = athletes.filter(a => a.eventIds.includes('pista_75m'));
+  const trackEntries75m = runners75m.map((r, idx) => {
+    let t = +(9.85 + (idx * 0.08)).toFixed(2);
+    if (idx === 2) t = 10.01; // empate intencional en bronce
+    if (idx === 3) t = 10.01;
+    return {
+      athleteId: r.id,
+      heatNumber: Math.floor(idx / 6) + 1,
+      laneNumber: (idx % 6) + 1,
+      timeSeconds: t,
+      status: 'valid'
+    };
+  });
+
+  // Intentos para Salto de Longitud (40 competidores)
+  const jumpers = athletes.filter(a => a.eventIds.includes('campo_longitud'));
+  const fieldEntriesLong = jumpers.map((j, idx) => {
+    const base = +(4.20 - (idx * 0.05)).toFixed(2);
+    const m1 = Math.max(1.5, +(base).toFixed(2));
+    const m2 = Math.max(1.4, +(base - 0.12).toFixed(2));
+    const m3 = Math.max(1.3, +(base - 0.20).toFixed(2));
+    return {
+      athleteId: j.id,
+      bestMark: m1,
+      attempts: [
+        { attemptNum: 1, value: m1, status: 'valid' },
+        { attemptNum: 2, value: m2, status: 'valid' },
+        { attemptNum: 3, value: m3, status: idx === 10 ? 'foul' : 'valid' }
+      ]
+    };
+  });
+
+  return {
+    schools,
+    athletes,
+    results: {
+      pista_75m: {
+        isAwarded: false,
+        trackEntries: trackEntries75m
+      },
+      campo_longitud: {
+        isAwarded: false,
+        fieldEntries: fieldEntriesLong
+      }
+    }
+  };
+}

@@ -17,7 +17,7 @@ import {
   DEFAULT_TOURNAMENT_INFO,
   STORAGE_KEY
 } from './utils/storage';
-import { DEMO_ATHLETES, DEMO_SCHOOLS, DEMO_INITIAL_RESULTS } from './constants/mockData';
+import { DEMO_ATHLETES, DEMO_SCHOOLS, DEMO_INITIAL_RESULTS, generateLargeStressTournamentData } from './constants/mockData';
 import { OFFICIAL_EVENTS } from './constants/events';
 import { computeTournamentEventStatus } from './utils/athleticsEngine';
 import {
@@ -255,6 +255,20 @@ export default function App() {
     pushStateToCloudIfOnline(demo);
   };
 
+  const handleLoadLargeSimulation = () => {
+    const sim = generateLargeStressTournamentData();
+    const fullSimState = {
+      tournament: DEFAULT_TOURNAMENT_INFO,
+      schools: sim.schools,
+      athletes: sim.athletes,
+      relays: [],
+      results: sim.results,
+      cloudSession: { enabled: true, userExplicitlyChoseOffline: false, roomCode: 'ATLETISMO-2026' }
+    };
+    setState(fullSimState);
+    pushStateToCloudIfOnline(fullSimState);
+  };
+
   const handleResetToZero = async () => {
     const currentRoom = state.cloudSession?.roomCode || 'ATLETISMO-2026';
 
@@ -419,6 +433,7 @@ export default function App() {
         tournament={state.tournament}
         onSaveTournament={handleSaveTournament}
         onLoadDemoData={handleLoadDemoData}
+        onLoadLargeSimulation={handleLoadLargeSimulation}
         onResetToZero={handleResetToZero}
         fullState={state}
         isAdmin={isAdmin}

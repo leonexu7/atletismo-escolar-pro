@@ -396,9 +396,31 @@ export default function MultiLaneStopwatchModal({
                   </span>
                 )}
               </div>
-              <p className="text-[11px] text-slate-500">
-                Línea de Meta: {activeEvent?.name || '75m Planos'} • {activeHeat.name || 'Serie 1'}
-              </p>
+              <div className="flex flex-wrap items-center gap-2 mt-1">
+                <span className="text-[11px] text-slate-500 font-medium">
+                  Línea de Meta: <strong className="text-slate-800">{activeEvent?.name || '75m Planos'}</strong>
+                </span>
+                {heats && heats.length > 0 && (
+                  <div className="flex items-center space-x-1.5 bg-slate-100/90 px-2 py-0.5 rounded-lg border border-slate-200">
+                    <span className="text-[10px] font-bold text-slate-600 uppercase tracking-wider">Serie:</span>
+                    <select
+                      value={selectedHeatIndex}
+                      disabled={isRaceRunning}
+                      onChange={(e) => {
+                        handleReset();
+                        if (onSelectHeatIndex) onSelectHeatIndex(Number(e.target.value));
+                      }}
+                      className="bg-white border border-slate-200 text-xs font-bold text-slate-800 rounded-md px-1.5 py-0.5 outline-none cursor-pointer focus:ring-1 focus:ring-amber-400 disabled:opacity-50"
+                    >
+                      {heats.map((h, idx) => (
+                        <option key={idx} value={idx}>
+                          {h.name || `Serie ${idx + 1}`} ({h.lanes?.length || 0} corredores)
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
