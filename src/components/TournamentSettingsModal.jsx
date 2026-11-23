@@ -16,7 +16,8 @@ import {
   KeyRound,
   ShieldCheck,
   CheckCircle2,
-  Keyboard
+  Keyboard,
+  Calendar
 } from 'lucide-react';
 import { exportTournamentBackupToFile, importTournamentFromFile, MASTER_RECOVERY_KEY } from '../utils/storage';
 import defaultBannerLogo from '../assets/puebla_sep_banner.jpg';
@@ -28,10 +29,12 @@ export default function TournamentSettingsModal({
   onSaveTournament,
   onLoadDemoData,
   onResetToZero,
-  fullState
+  fullState,
+  isAdmin = false
 }) {
   const [formData, setFormData] = useState({ ...tournament });
   const [isSecretPanelUnlocked, setIsSecretPanelUnlocked] = useState(false);
+  const [isDeadlineUnlocked, setIsDeadlineUnlocked] = useState(false);
   const [showAirKeyboardInput, setShowAirKeyboardInput] = useState(false);
   const [airTypedText, setAirTypedText] = useState('');
   const [tapCount, setTapCount] = useState(0);
@@ -40,6 +43,20 @@ export default function TournamentSettingsModal({
   const bufferTimerRef = useRef(null);
   const fileInputRef = useRef(null);
   const logoInputRef = useRef(null);
+
+  const canEditDeadline = isAdmin || isDeadlineUnlocked || isSecretPanelUnlocked;
+
+  const handleUnlockDeadline = () => {
+    const entered = window.prompt('Ingresa la contraseña oficial de Mesa de Control para configurar la fecha límite:');
+    if (!entered) return;
+    const officialPin = formData.adminPin || tournament?.adminPin || 'atletismo2026';
+    if (entered.trim() === officialPin.trim()) {
+      setIsDeadlineUnlocked(true);
+      alert('Acceso concedido. Ahora puedes modificar la fecha límite de inscripciones.');
+    } else {
+      alert('Contraseña de Mesa de Control incorrecta.');
+    }
+  };
 
   const SECRET_WORDS = ['clave', 'pin', 'admin', 'sep', 'atletismo', 'desbloquear'];
 
@@ -344,6 +361,85 @@ export default function TournamentSettingsModal({
                 className="rounded text-amber-600 focus:ring-amber-400 h-4 w-4 shrink-0"
               />
             </label>
+          </div>
+
+          {/* Fecha Límite de Inscripciones para Maestros (Bloqueo Extemporáneo) */}
+          <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200 space-y-2.5">
+            <div className="flex items-center justify-between">
+              <label className="flex items-center space-x-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={Boolean(formData.registrationDeadlineEnabled)}
+                  onChange={(e) => {
+                    if (!canEditDeadline) {
+                      e.preventDefault();
+                      handleUnlockDeadline();
+                      return;
+                    }
+                    handleChange('registrationDeadlineEnabled', e.target.checked);
+                  }}
+                  className="rounded text-rose-600 focus:ring-rose-400 h-4 w-4"
+                />
+                <span className="text-xs font-bold text-slate-800 flex items-center space-x-1.5">
+                  <Calendar className="w-4 h-4 text-rose-600" />
+                  <span>Establecer Fecha Límite de Inscripción de Alumnos</span>
+                </span>
+              </label>
+
+              <div className="flex items-center space-x-1.5">
+                {formData.registrationDeadlineEnabled && (
+                  <span className="text-[10px] font-bold text-rose-700 bg-rose-100 border border-rose-300 px-2 py-0.5 rounded-full">
+                    Cierre Activo
+                  </span>
+                )}
+                {canEditDeadline ? (
+                  <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full flex items-center space-x-1">
+                    <Unlock className="w-3 h-3 text-emerald-600" />
+                    <span>Mesa de Control</span>
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleUnlockDeadline}
+                    className="text-[10px] font-bold text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-200 px-2 py-0.5 rounded-full flex items-center space-x-1 transition-colors cursor-pointer"
+                    title="Desbloquear con PIN de Mesa de Control para modificar"
+                  >
+                    <Lock className="w-3 h-3 text-amber-600" />
+                    <span>Desbloquear con Clave</span>
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {formData.registrationDeadlineEnabled && (
+              <div className="pt-2 border-t border-slate-200 space-y-2 animate-in fade-in">
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                    Último día permitido para registrar alumnos (cierra a las 23:59 hrs):
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="date"
+                      value={formData.registrationDeadline || ''}
+                      disabled={!canEditDeadline}
+                      onChange={(e) => handleChange('registrationDeadline', e.target.value)}
+                      onClick={() => {
+                        if (!canEditDeadline) handleUnlockDeadline();
+                      }}
+                      className={`w-full border rounded-xl px-3 py-1.5 text-xs text-slate-900 outline-none transition-colors ${
+                        canEditDeadline
+                          ? 'bg-white border-slate-300 focus:ring-2 focus:ring-rose-400'
+                          : 'bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed'
+                      }`}
+                      required={Boolean(formData.registrationDeadlineEnabled)}
+                    />
+                  </div>
+                </div>
+                <p className="text-[10px] text-slate-500 leading-snug">
+                  Pasada esta fecha, el sistema bloqueará el registro, modificación y eliminación de alumnos para los maestros, evitando que agreguen participantes después del plazo acordado. Solo usuarios con clave de Mesa de Control podrán hacer excepciones.
+                </p>
+              </div>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-3">

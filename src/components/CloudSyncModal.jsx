@@ -177,11 +177,6 @@ export default function CloudSyncModal({
                       {cloudSession?.enabled ? '🟢 Nube Conectada en Vivo (Predeterminada)' : '⚪ Modo Offline (Desconectado)'}
                     </span>
                   </div>
-                  <p className="text-[11px] text-slate-600 mt-0.5 leading-snug">
-                    {cloudSession?.enabled
-                      ? 'La nube está siempre activa por defecto para que las inscripciones de los maestros se sincronicen 2 días antes o en vivo sin perder datos entre computadoras y celulares.'
-                      : 'Atención: Los registros solo se guardan en este dispositivo. Para que los demás vean los competidores, conéctate a la nube.'}
-                  </p>
                 </div>
               </div>
 
@@ -308,9 +303,6 @@ export default function CloudSyncModal({
                 Aislamiento Total entre Karate Brackets Pro y Atletismo
               </h4>
             </div>
-            <p className="text-[11px] text-sky-900 leading-relaxed">
-              <strong>Tus datos nunca se cruzan ni se mezclan:</strong> Atletismo Escolar Pro utiliza exclusivamente su propia colección en Firestore llamada <code className="bg-white/80 px-1 py-0.2 rounded font-mono text-sky-800 font-bold">atletismo_tournaments</code>. Aunque uses el mismo proyecto de Firebase para ambos deportes o tengas dos proyectos separados, los registros de atletismo jamás aparecerán en karate ni viceversa.
-            </p>
 
             <button
               type="button"

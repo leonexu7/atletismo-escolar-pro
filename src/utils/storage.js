@@ -20,7 +20,9 @@ export const DEFAULT_TOURNAMENT_INFO = {
   categoryGroupingMode: 'unified', // 'unified' = Categoría Única (Solo Varonil y Femenil sin separar por edades) | 'by_grades' = Dividir por Grados (3°-4° y 5°-6°)
   customLogo: null, // Logotipo personalizado en Base64 (si es null, usa el logotipo oficial del Gobierno de Puebla / SEP)
   showLogoInControlDesk: false, // Botón en ajustes: permite activarlo también en la Mesa de Control
-  enableDiplomas: false // Opción en ajustes para activar/desactivar la emisión de diplomas de ganadores
+  enableDiplomas: false, // Opción en ajustes para activar/desactivar la emisión de diplomas de ganadores
+  registrationDeadline: '', // Fecha límite de inscripción (YYYY-MM-DD)
+  registrationDeadlineEnabled: false // Activar/desactivar fecha límite de inscripciones
 };
 
 export const MASTER_RECOVERY_KEY = 'SEP-PUEBLA-2026';

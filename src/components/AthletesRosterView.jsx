@@ -23,15 +23,19 @@ import {
 import { OFFICIAL_EVENTS, isTrackEvent, isFieldEvent } from '../constants/events';
 import { exportMasterAthletesRosterToExcel } from '../utils/excelHandler';
 import { generateMasterAthletesRosterPDF } from '../utils/pdfGenerator';
-import { calculateAge } from '../utils/timeFormatter';
+import { calculateAge, isRegistrationDeadlineExpired, formatDeadlineFriendly } from '../utils/timeFormatter';
 
 export default function AthletesRosterView({
   tournament,
   athletes = [],
   schools = [],
   onUpdateAthlete,
-  onDeleteAthlete
+  onDeleteAthlete,
+  isAdmin = false,
+  onOpenAdminLogin
 }) {
+  const isDeadlineExpired = isRegistrationDeadlineExpired(tournament);
+  const isLockedForTeacher = isDeadlineExpired && !isAdmin;
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedGender, setSelectedGender] = useState('ALL'); // ALL | M | F
   const [selectedSchoolId, setSelectedSchoolId] = useState('ALL');
@@ -146,6 +150,10 @@ export default function AthletesRosterView({
   const handleSaveAthleteEdit = (e) => {
     e.preventDefault();
     if (!editingAthlete) return;
+    if (isLockedForTeacher) {
+      alert(`El periodo de registro oficial cerró el ${formatDeadlineFriendly(tournament?.registrationDeadline)}. Se requiere acceso de Mesa de Control para modificar atletas.`);
+      return;
+    }
     onUpdateAthlete(editingAthlete);
     setEditingAthlete(null);
   };
@@ -227,6 +235,28 @@ export default function AthletesRosterView({
           </button>
         </div>
       </div>
+
+      {/* Alerta de Cierre de Inscripciones por Fecha Límite */}
+      {isLockedForTeacher && (
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 shadow-2xs">
+          <div className="flex items-center space-x-2.5 text-xs text-amber-900">
+            <AlertCircle className="w-5 h-5 text-amber-600 shrink-0" />
+            <div>
+              <span className="font-bold">Periodo de inscripción cerrado ({formatDeadlineFriendly(tournament?.registrationDeadline)}):</span>{' '}
+              El padrón se encuentra en modo sólo lectura para evitar adiciones o modificaciones no autorizadas.
+            </div>
+          </div>
+          {onOpenAdminLogin && (
+            <button
+              type="button"
+              onClick={onOpenAdminLogin}
+              className="self-start sm:self-auto shrink-0 px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold transition-colors shadow-2xs"
+            >
+              Desbloquear Mesa de Control
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Tarjetas de Estadísticas en Colores Pastel */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -545,28 +575,40 @@ export default function AthletesRosterView({
 
                       {/* Acciones */}
                       <td className="py-3 px-3.5 text-right">
-                        <div className="flex items-center justify-end space-x-1.5">
-                          <button
-                            type="button"
-                            onClick={() => setEditingAthlete({ ...athlete })}
-                            className="p-1.5 rounded-lg text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
-                            title="Editar datos del atleta"
-                          >
-                            <Edit2 className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              if (window.confirm(`¿Confirmas eliminar a ${athlete.fullName} del padrón general?`)) {
-                                onDeleteAthlete(athlete.id);
-                              }
-                            }}
-                            className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
-                            title="Eliminar del padrón"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
+                        {isLockedForTeacher ? (
+                          <div className="flex items-center justify-end">
+                            <span
+                              className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-lg text-[10px] font-semibold bg-slate-100 text-slate-500 border border-slate-200"
+                              title="Inscripciones concluidas por fecha límite oficial. Requiere clave de Mesa de Control para modificar."
+                            >
+                              <Lock className="w-3 h-3 text-slate-400" />
+                              <span>Cerrado</span>
+                            </span>
+                          </div>
+                        ) : (
+                          <div className="flex items-center justify-end space-x-1.5">
+                            <button
+                              type="button"
+                              onClick={() => setEditingAthlete({ ...athlete })}
+                              className="p-1.5 rounded-lg text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
+                              title="Editar datos del atleta"
+                            >
+                              <Edit2 className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (window.confirm(`¿Confirmas eliminar a ${athlete.fullName} del padrón general?`)) {
+                                  onDeleteAthlete(athlete.id);
+                                }
+                              }}
+                              className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+                              title="Eliminar del padrón"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        )}
                       </td>
                     </tr>
                   );

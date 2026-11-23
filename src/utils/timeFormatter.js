@@ -159,3 +159,52 @@ export function formatBirthDateWithAge(birthDateInput) {
   if (age === null) return String(birthDateInput);
   return `${birthDateInput} (${age} años)`;
 }
+
+/**
+ * Determina si la fecha límite de inscripción ha vencido.
+ * Si es YYYY-MM-DD, vence a las 23:59:59.999 de ese día.
+ * Admite pasar currentTimestamp para pruebas unitarias deterministas.
+ */
+export function isRegistrationDeadlineExpired(tournament, currentTimestamp = Date.now()) {
+  if (!tournament || !tournament.registrationDeadlineEnabled || !tournament.registrationDeadline) {
+    return false;
+  }
+  const raw = String(tournament.registrationDeadline).trim();
+  if (!raw) return false;
+
+  let deadlineMs;
+  if (raw.includes('T')) {
+    const parsed = new Date(raw);
+    deadlineMs = parsed.getTime();
+  } else {
+    const parts = raw.split('-').map(Number);
+    if (parts.length === 3) {
+      // YYYY, MM-1, DD a las 23:59:59.999
+      const endOfDay = new Date(parts[0], parts[1] - 1, parts[2], 23, 59, 59, 999);
+      deadlineMs = endOfDay.getTime();
+    } else {
+      deadlineMs = new Date(raw).getTime();
+    }
+  }
+
+  if (isNaN(deadlineMs)) return false;
+  return currentTimestamp > deadlineMs;
+}
+
+/**
+ * Formato legible en español de la fecha límite (ej. "25 de noviembre de 2026 (23:59 hrs)")
+ */
+export function formatDeadlineFriendly(deadlineInput) {
+  if (!deadlineInput) return '';
+  const raw = String(deadlineInput).trim();
+  const datePart = raw.split('T')[0];
+  const parts = datePart.split('-').map(Number);
+  if (parts.length === 3) {
+    const months = [
+      'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
+      'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'
+    ];
+    return `${parts[2]} de ${months[parts[1] - 1]} de ${parts[0]} (23:59 hrs)`;
+  }
+  return raw;
+}

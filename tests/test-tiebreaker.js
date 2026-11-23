@@ -3,7 +3,16 @@
  */
 
 import { evaluateFieldAttempts, rankFieldEventCompetitors, rankTrackEventRunners } from '../src/utils/tieBreaker.js';
-import { formatTrackTime, parseTrackTime, formatFieldDistance, parseFieldDistance, calculateAge, formatBirthDateWithAge } from '../src/utils/timeFormatter.js';
+import {
+  formatTrackTime,
+  parseTrackTime,
+  formatFieldDistance,
+  parseFieldDistance,
+  calculateAge,
+  formatBirthDateWithAge,
+  isRegistrationDeadlineExpired,
+  formatDeadlineFriendly
+} from '../src/utils/timeFormatter.js';
 import { PARTICIPATION_LIMITS } from '../src/constants/categories.js';
 import { cleanCCT, cleanSchoolName, findExistingSchoolMatch } from '../src/utils/schoolNormalizer.js';
 import { DEFAULT_TOURNAMENT_INFO, MASTER_RECOVERY_KEY, loadTournamentState } from '../src/utils/storage.js';
@@ -299,6 +308,45 @@ assert(shouldShowLocalButton(true, false, false) === false, 'En modo Online norm
 assert(shouldShowLocalButton(false, false, false) === true, 'En modo Offline, el botón Disparo Local Meta DEBE SER VISIBLE');
 assert(shouldShowLocalButton(true, true, false) === true, 'En modo Online con emergencia activada por falla del starter, permite mostrar el botón de respaldo');
 assert(shouldShowLocalButton(false, false, true) === false, 'Durante la carrera no se muestra disparo local');
+
+// 7. Verificando Fecha Límite de Inscripciones y Bloqueo de Maestros vs Mesa de Control:
+console.log('\n📌 Verificando Regla de Fecha Límite de Registro (Bloqueo Extemporáneo):');
+
+const mockTournamentNoDeadline = {
+  registrationDeadlineEnabled: false,
+  registrationDeadline: '2026-11-20'
+};
+assert(
+  isRegistrationDeadlineExpired(mockTournamentNoDeadline, new Date('2026-11-25T12:00:00').getTime()) === false,
+  'Si la fecha límite está desactivada, nunca expira'
+);
+
+const mockTournamentWithDeadline = {
+  registrationDeadlineEnabled: true,
+  registrationDeadline: '2026-11-20'
+};
+
+// Evaluamos exactamente a las 23:59:59 del 20 de noviembre de 2026
+const beforeMidnight = new Date(2026, 10, 20, 23, 59, 58).getTime(); // mes 10 = noviembre
+const afterMidnight = new Date(2026, 10, 21, 0, 0, 1).getTime();
+
+assert(
+  isRegistrationDeadlineExpired(mockTournamentWithDeadline, beforeMidnight) === false,
+  'El día de la fecha límite antes de las 23:59:59 todavía está ABIERTO el registro'
+);
+assert(
+  isRegistrationDeadlineExpired(mockTournamentWithDeadline, afterMidnight) === true,
+  'Pasadas las 23:59:59 de la fecha límite el registro está EXPIRADO'
+);
+
+// Verificamos permisos: Maestro (no admin) bloqueado vs Mesa de Control (admin) permitido
+const deadlineExpired = isRegistrationDeadlineExpired(mockTournamentWithDeadline, afterMidnight);
+const isLockedForTeacher = deadlineExpired && !false; // isAdmin = false
+const isLockedForAdmin = deadlineExpired && !true;   // isAdmin = true
+
+assert(isLockedForTeacher === true, 'Para maestros sin clave de Mesa de Control, el registro está BLOQUEADO después de la fecha límite');
+assert(isLockedForAdmin === false, 'Para Mesa de Control (admin = true), el registro permanece DESBLOQUEADO para inscripciones extemporáneas');
+assert(formatDeadlineFriendly('2026-11-20').includes('20 de noviembre de 2026'), 'formatDeadlineFriendly formatea fecha amigable');
 
 console.log('\n----------------------------------------');
 if (failedTests === 0) {

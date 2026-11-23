@@ -29,7 +29,7 @@ import {
 import { OFFICIAL_EVENTS, isTrackEvent, isFieldEvent } from '../constants/events';
 import { SCHOOL_CATEGORIES, PARTICIPATION_LIMITS } from '../constants/categories';
 import { downloadExcelRegistrationTemplate, parseExcelAthletesFile } from '../utils/excelHandler';
-import { calculateAge } from '../utils/timeFormatter';
+import { calculateAge, isRegistrationDeadlineExpired, formatDeadlineFriendly } from '../utils/timeFormatter';
 import RelayBuilderModal from './RelayBuilderModal';
 import SchoolSelectorModal from './SchoolSelectorModal';
 
@@ -98,6 +98,10 @@ export default function TeacherRegistrationView({
   // Estado del modal de edición de competidor (estilo karate)
   const [editingAthlete, setEditingAthlete] = useState(null);
 
+  // Verificación de fecha límite de inscripciones
+  const isDeadlineExpired = isRegistrationDeadlineExpired(tournament);
+  const isLockedForTeacher = isDeadlineExpired && !isAdmin;
+
   const [searchTerm, setSearchTerm] = useState('');
   const [filterGender, setFilterGender] = useState('ALL');
   const [isRelayModalOpen, setIsRelayModalOpen] = useState(false);
@@ -151,6 +155,11 @@ export default function TeacherRegistrationView({
   const handleRegisterSubmit = (e) => {
     e.preventDefault();
 
+    if (isLockedForTeacher) {
+      alert(`El período oficial de inscripciones concluyó el ${formatDeadlineFriendly(tournament.registrationDeadline)}. Los maestros ya no pueden registrar alumnos extemporáneos sin clave de Mesa de Control.`);
+      return;
+    }
+
     if (!athleteForm.fullName.trim()) {
       alert('Por favor ingresa el nombre completo del alumno.');
       return;
@@ -197,6 +206,12 @@ export default function TeacherRegistrationView({
   // Guardar edición de un atleta existente
   const handleSaveEditedAthlete = (e) => {
     e.preventDefault();
+
+    if (isLockedForTeacher) {
+      alert(`El período de inscripciones cerró el ${formatDeadlineFriendly(tournament.registrationDeadline)}. No es posible modificar datos de alumnos.`);
+      return;
+    }
+
     if (!editingAthlete.fullName?.trim()) {
       alert('El nombre es obligatorio.');
       return;
@@ -226,6 +241,11 @@ export default function TeacherRegistrationView({
   };
 
   const handleDeleteCoachAthlete = (ath) => {
+    if (isLockedForTeacher) {
+      alert(`El período de inscripciones cerró el ${formatDeadlineFriendly(tournament.registrationDeadline)}. No es posible dar de baja a alumnos.`);
+      return;
+    }
+
     if (window.confirm(`¿Dar de baja a ${ath.fullName} de la cédula de tu escuela?`)) {
       onDeleteAthlete(ath.id);
       setSuccessNotice(`Alumno dado de baja.`);
@@ -237,6 +257,12 @@ export default function TeacherRegistrationView({
   const handleExcelUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    if (isLockedForTeacher) {
+      alert(`El período de inscripciones cerró el ${formatDeadlineFriendly(tournament.registrationDeadline)}. No es posible subir archivos de alumnos.`);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
 
     setExcelLoading(true);
     try {
@@ -356,6 +382,51 @@ export default function TeacherRegistrationView({
         </div>
       </div>
 
+      {/* Banner de Cierre de Inscripciones por Fecha Límite */}
+      {isDeadlineExpired && (
+        <div className={`p-4 rounded-2xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs ${
+          isLockedForTeacher
+            ? 'bg-rose-50 border-rose-200 text-rose-950'
+            : 'bg-amber-50 border-amber-200 text-amber-950'
+        }`}>
+          <div className="flex items-start space-x-3">
+            <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 mt-0.5 ${
+              isLockedForTeacher ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-800'
+            }`}>
+              <Lock className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <h4 className="font-bold text-xs sm:text-sm">
+                  {isLockedForTeacher
+                    ? '🔒 Período de Inscripción de Alumnos Concluido'
+                    : '⚠️ Inscripciones Cerradas para Maestros (Modo Mesa de Control Activo)'}
+                </h4>
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                  isLockedForTeacher ? 'bg-rose-100 text-rose-800 border-rose-300' : 'bg-amber-100 text-amber-800 border-amber-300'
+                }`}>
+                  Fecha Límite: {formatDeadlineFriendly(tournament?.registrationDeadline)}
+                </span>
+              </div>
+              <p className="text-[11px] mt-1 leading-relaxed text-slate-700">
+                {isLockedForTeacher
+                  ? 'La fecha límite acordada para la entrega de cédulas ha concluido. Por normativa para no alterar las series ni el rol de competencias, los maestros ya no pueden registrar, editar ni eliminar competidores. Si requieres un cambio extraordinario justificado, solicita apoyo a la Mesa de Control.'
+                  : 'El plazo para los maestros ya venció y el portal público está bloqueado para ellos. Como juez o administrador con clave de Mesa de Control, tienes autorización para realizar modificaciones y registros extemporáneos.'}
+              </p>
+            </div>
+          </div>
+          {isLockedForTeacher && (
+            <button
+              type="button"
+              onClick={onOpenAdminLogin}
+              className="px-3.5 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold shrink-0 transition-colors shadow-2xs self-start sm:self-center"
+            >
+              Acceso Mesa de Control
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Tarjeta de la Escuela con Botón para Cambiar/Registrar y Mesa de Control */}
       <div className="bg-white border border-slate-200/90 rounded-2xl p-4 sm:p-5 shadow-xs">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
@@ -427,8 +498,13 @@ export default function TeacherRegistrationView({
 
             <button
               onClick={() => fileInputRef.current?.click()}
-              disabled={excelLoading}
-              className="px-3 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-xl text-xs font-bold flex items-center space-x-1.5 transition-colors shadow-xs"
+              disabled={excelLoading || isLockedForTeacher}
+              className={`px-3 py-2 border rounded-xl text-xs font-bold flex items-center space-x-1.5 transition-colors shadow-xs ${
+                isLockedForTeacher
+                  ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
+                  : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-200'
+              }`}
+              title={isLockedForTeacher ? 'Carga masiva bloqueada por fecha límite' : 'Subir archivo Excel de alumnos'}
             >
               <FileSpreadsheet className="w-3.5 h-3.5" />
               <span>{excelLoading ? 'Cargando...' : 'Subir Excel'}</span>
@@ -610,10 +686,15 @@ export default function TeacherRegistrationView({
 
             <button
               type="submit"
-              className="w-full py-2.5 bg-rose-500 hover:bg-rose-600 text-white font-bold text-xs rounded-xl shadow-xs transition-colors flex items-center justify-center space-x-1.5"
+              disabled={isLockedForTeacher}
+              className={`w-full py-2.5 font-bold text-xs rounded-xl shadow-xs transition-colors flex items-center justify-center space-x-1.5 ${
+                isLockedForTeacher
+                  ? 'bg-slate-200 text-slate-500 border border-slate-300 cursor-not-allowed'
+                  : 'bg-rose-500 hover:bg-rose-600 text-white'
+              }`}
             >
-              <Check className="w-4 h-4" />
-              <span>Inscribir Alumno en la Cédula</span>
+              {isLockedForTeacher ? <Lock className="w-4 h-4 text-slate-500" /> : <Check className="w-4 h-4" />}
+              <span>{isLockedForTeacher ? 'Inscripciones Cerradas por Fecha Límite' : 'Inscribir Alumno en la Cédula'}</span>
             </button>
           </form>
         </div>
@@ -730,26 +811,38 @@ export default function TeacherRegistrationView({
                     </div>
 
                     {/* Botón Editar Competidor y Eliminar (Exacto estilo karate) */}
-                    <div className="flex items-center space-x-2 shrink-0 self-end sm:self-center pl-7 sm:pl-0">
-                      <button
-                        type="button"
-                        onClick={() => setEditingAthlete({ ...ath })}
-                        className="px-3 py-1.5 bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-300 rounded-xl font-bold text-xs flex items-center space-x-1.5 transition-colors shadow-xs"
-                        title="Editar los datos y pruebas de este alumno"
-                      >
-                        <Edit2 className="w-3.5 h-3.5" />
-                        <span>Editar</span>
-                      </button>
+                    {isLockedForTeacher ? (
+                      <div className="flex items-center space-x-1 shrink-0 self-end sm:self-center pl-7 sm:pl-0">
+                        <span
+                          className="text-[10px] font-semibold text-slate-400 bg-slate-100 border border-slate-200 px-2 py-1 rounded-lg flex items-center space-x-1"
+                          title="Inscripciones cerradas por fecha límite. Solo la Mesa de Control puede modificar."
+                        >
+                          <Lock className="w-3 h-3 text-slate-400" />
+                          <span>Bloqueado</span>
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center space-x-2 shrink-0 self-end sm:self-center pl-7 sm:pl-0">
+                        <button
+                          type="button"
+                          onClick={() => setEditingAthlete({ ...ath })}
+                          className="px-3 py-1.5 bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-300 rounded-xl font-bold text-xs flex items-center space-x-1.5 transition-colors shadow-xs"
+                          title="Editar los datos y pruebas de este alumno"
+                        >
+                          <Edit2 className="w-3.5 h-3.5" />
+                          <span>Editar</span>
+                        </button>
 
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteCoachAthlete(ath)}
-                        className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
-                        title="Eliminar alumno"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteCoachAthlete(ath)}
+                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                          title="Eliminar alumno"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    )}
                   </div>
                 ))
               )}

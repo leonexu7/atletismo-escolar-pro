@@ -338,6 +338,8 @@ export default function App() {
             schools={state.schools}
             onUpdateAthlete={handleUpdateAthlete}
             onDeleteAthlete={handleDeleteAthlete}
+            isAdmin={isAdmin}
+            onOpenAdminLogin={() => setIsAdminLoginOpen(true)}
           />
         )}
 
@@ -388,6 +390,7 @@ export default function App() {
         onLoadDemoData={handleLoadDemoData}
         onResetToZero={handleResetToZero}
         fullState={state}
+        isAdmin={isAdmin}
       />
 
       {/* Modal de Nube y Código Compartible */}
