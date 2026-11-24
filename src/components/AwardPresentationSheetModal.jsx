@@ -4,9 +4,10 @@ import {
   Printer,
   Download,
   Trophy,
-  Award,
+  Medal,
   Calendar,
-  MapPin
+  MapPin,
+  Sparkles
 } from 'lucide-react';
 import { generateAwardPresentationSheetPDF } from '../utils/pdfGenerator';
 
@@ -25,7 +26,6 @@ export default function AwardPresentationSheetModal({
   const goldWinner = rankedList[0];
   const silverWinner = rankedList[1];
   const bronzeWinner = rankedList[2];
-  const otherFinalists = rankedList.slice(3, 8); // 4º al 8º lugar
 
   const genderLabel = event?.id?.includes('mixto')
     ? 'Mixto'
@@ -47,15 +47,15 @@ export default function AwardPresentationSheetModal({
         {/* Barra de Acciones Superior */}
         <div className="bg-slate-50 border-b border-slate-200 px-4 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center space-x-2.5">
-            <div className="w-8 h-8 rounded-lg bg-white border border-slate-200 text-slate-700 flex items-center justify-center shadow-2xs">
-              <Trophy className="w-4 h-4 text-amber-600" />
+            <div className="w-8 h-8 rounded-lg bg-amber-50 border border-amber-200 text-amber-600 flex items-center justify-center shadow-2xs">
+              <Trophy className="w-4 h-4" />
             </div>
             <div>
               <h3 className="font-bold text-sm text-slate-900">
-                Cédula Oficial de Premiación de Lugares
+                Cédula Oficial de Premiación de Podio
               </h3>
               <p className="text-[11px] text-slate-500">
-                Formato técnico oficial minimalista • Ahorro de tinta (Ink-Friendly)
+                Presentación de honor oficial • 1º, 2º y 3º Lugar
               </p>
             </div>
           </div>
@@ -64,10 +64,10 @@ export default function AwardPresentationSheetModal({
             <button
               type="button"
               onClick={handleDownloadPDF}
-              className="px-3.5 py-1.5 bg-slate-900 hover:bg-black text-white rounded-xl text-xs font-bold flex items-center space-x-1.5 shadow-2xs transition-all active:scale-95"
+              className="px-3.5 py-1.5 bg-amber-500 hover:bg-amber-600 text-slate-950 rounded-xl text-xs font-black flex items-center space-x-1.5 shadow-2xs transition-all active:scale-95"
               title="Descargar cédula oficial de premiación en PDF listo para imprimir"
             >
-              <Download className="w-3.5 h-3.5 text-amber-400" />
+              <Download className="w-3.5 h-3.5" />
               <span>Descargar PDF</span>
             </button>
 
@@ -92,116 +92,119 @@ export default function AwardPresentationSheetModal({
           </div>
         </div>
 
-        {/* Contenedor de la Hoja de Premiación (Diseño Minimalista, Limpio y de Ahorro de Tinta) */}
-        <div className="p-4 sm:p-7 max-h-[82vh] overflow-y-auto bg-slate-100/50">
+        {/* Contenedor de la Hoja de Premiación */}
+        <div className="p-4 sm:p-7 max-h-[82vh] overflow-y-auto bg-slate-100/60">
           <div
             ref={printRef}
-            className="bg-white rounded-xl border border-slate-300 shadow-sm p-6 sm:p-8 space-y-6"
+            className="bg-white rounded-2xl border-2 border-amber-300/80 shadow-md p-6 sm:p-9 space-y-7"
           >
-            {/* Marco interior fino institucional */}
-            <div className="border border-slate-200 rounded-lg p-5 sm:p-7 space-y-6 bg-white">
-              {/* Encabezado Institucional y Deportivo */}
-              <div className="text-center space-y-1.5 pb-4 border-b border-slate-200">
-                <span className="text-[10px] font-bold tracking-widest text-slate-500 uppercase block">
-                  SUPERVISIÓN GENERAL DE EDUCACIÓN FÍSICA  •  COMITÉ ORGANIZADOR
+            {/* Marco interior fino institucional con sutil toque dorado */}
+            <div className="border border-slate-200/90 rounded-xl p-5 sm:p-7 space-y-7 bg-white relative">
+              {/* Encabezado Institucional y Deportivo con Color y Elegancia */}
+              <div className="text-center space-y-1.5 pb-4 border-b border-slate-200/80 relative">
+                <span className="text-[10px] font-black tracking-widest text-amber-700 uppercase bg-amber-50 px-3 py-1 rounded-full border border-amber-200 inline-flex items-center space-x-1.5 mb-1 shadow-2xs">
+                  <Sparkles className="w-3 h-3 text-amber-500" />
+                  <span>CÉDULA OFICIAL DE PREMIACIÓN Y PODIO DE HONOR</span>
+                  <Sparkles className="w-3 h-3 text-amber-500" />
                 </span>
-                <h1 className="text-lg sm:text-2xl font-black text-slate-900 tracking-tight uppercase">
+                <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight uppercase">
                   {tournament.name || 'Juegos Deportivos Escolares de Atletismo 2026'}
                 </h1>
-                <p className="text-xs font-semibold text-slate-600 uppercase tracking-wide">
-                  Cédula Oficial de Premiación y Podio de Honor
+                <p className="text-xs text-slate-600 font-medium">
+                  {tournament.organizer || 'Comité Organizador y Supervisión General de Educación Física'}
                 </p>
 
-                {/* Metadatos de la Prueba en Línea Limpia */}
-                <div className="pt-2 grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs border-t border-slate-100 mt-3 pt-3 text-slate-700">
-                  <div className="text-left">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase block">Prueba Oficial</span>
-                    <span className="font-bold text-slate-900">{event?.name || 'Prueba Oficial'}</span>
-                  </div>
-                  <div className="text-left">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase block">Rama</span>
-                    <span className="font-bold text-slate-900">{genderLabel}</span>
-                  </div>
-                  <div className="text-left">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase block">Fecha</span>
-                    <span className="font-medium text-slate-800">{tournament.date || new Date().toLocaleDateString('es-MX')}</span>
-                  </div>
-                  <div className="text-left">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase block">Sede</span>
-                    <span className="font-medium text-slate-800">{tournament.venue || 'Estadio Escolar'}</span>
-                  </div>
+                {/* Metadatos de la Prueba en Pastillas Pastel Coloridas */}
+                <div className="pt-2 flex flex-wrap items-center justify-center gap-2 text-xs mt-2">
+                  <span className="bg-rose-50 text-rose-800 border border-rose-200 px-3.5 py-1 rounded-xl font-bold flex items-center space-x-1 shadow-2xs">
+                    <Trophy className="w-3.5 h-3.5 text-rose-600" />
+                    <span>Prueba: {event?.name || 'Prueba Oficial'}</span>
+                  </span>
+                  <span className="bg-sky-50 text-sky-800 border border-sky-200 px-3 py-1 rounded-xl font-bold shadow-2xs">
+                    Rama: {genderLabel}
+                  </span>
+                  <span className="bg-amber-50 text-amber-900 border border-amber-200 px-3 py-1 rounded-xl font-medium flex items-center space-x-1 shadow-2xs">
+                    <Calendar className="w-3 h-3 text-amber-600" />
+                    <span>{tournament.date || new Date().toLocaleDateString('es-MX')}</span>
+                  </span>
+                  <span className="bg-emerald-50 text-emerald-800 border border-emerald-200 px-3 py-1 rounded-xl font-medium flex items-center space-x-1 shadow-2xs">
+                    <MapPin className="w-3 h-3 text-emerald-600" />
+                    <span>{tournament.venue || 'Estadio Escolar'}</span>
+                  </span>
                 </div>
               </div>
 
-              {/* PODIO DE HONOR (1º, 2º y 3º LUGAR EN 3 COLUMNAS LIMPIAS) */}
-              <div className="space-y-3">
-                <div className="text-center">
-                  <span className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">
-                    Cuadro de Honor • Podio Oficial
-                  </span>
+              {/* PODIO DE HONOR (1º, 2º y 3º LUGAR EN 3 COLUMNAS PROTAGÓNICAS) */}
+              <div className="space-y-4 pt-1">
+                <div className="flex items-center justify-center space-x-2 text-slate-700 font-bold text-xs uppercase tracking-wider">
+                  <Medal className="w-4 h-4 text-amber-500" />
+                  <span>Podio Oficial de Campeones</span>
+                  <Medal className="w-4 h-4 text-amber-500" />
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-1">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-5 pt-2 items-end">
                   {/* 2º LUGAR (MEDALLA DE PLATA) */}
-                  <div className="rounded-xl border border-slate-200 bg-white p-4 text-center shadow-2xs flex flex-col justify-between order-2 md:order-1 border-t-2 border-t-slate-400">
+                  <div className="rounded-2xl border-2 border-slate-300 bg-gradient-to-b from-slate-100/70 to-white p-5 text-center shadow-xs flex flex-col justify-between order-2 md:order-1 relative min-h-[260px]">
+                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-slate-200 text-slate-800 text-[10px] font-black uppercase tracking-wider px-3.5 py-0.5 rounded-full shadow-2xs border border-slate-300">
+                      SUB-CAMPEÓN
+                    </div>
                     <div>
-                      <div className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full border border-slate-200 text-slate-700 text-[10px] font-bold mb-2">
-                        <span>🥈 2º LUGAR</span>
-                        <span className="text-slate-400">•</span>
-                        <span>PLATA</span>
+                      <div className="w-12 h-12 mx-auto rounded-full bg-gradient-to-br from-slate-200 to-slate-300 border-2 border-slate-300 text-slate-800 font-athletic font-black text-xl flex items-center justify-center shadow-2xs mt-2 mb-3">
+                        🥈 2º
                       </div>
-                      <h4 className="font-bold text-sm sm:text-base text-slate-900 mt-1">
+                      <h4 className="font-bold text-base sm:text-lg text-slate-900">
                         {silverWinner?.fullName || 'Por definir'}
                       </h4>
-                      <p className="text-xs text-slate-500 mt-0.5">
+                      <p className="text-xs text-slate-600 font-medium mt-1">
                         {silverWinner?.schoolName || 'Escuela Primaria'}
                       </p>
                       {silverWinner?.bibNumber && (
-                        <span className="inline-block mt-1 font-mono text-[10px] font-semibold text-slate-600 bg-slate-50 px-2 py-0.5 rounded border border-slate-200">
+                        <span className="inline-block mt-2 font-mono text-[11px] font-bold text-slate-600 bg-white px-2.5 py-0.5 rounded-md border border-slate-200 shadow-2xs">
                           Dorsal #{silverWinner.bibNumber}
                         </span>
                       )}
                     </div>
-                    <div className="mt-3 pt-2.5 border-t border-slate-100">
-                      <span className="text-[9px] uppercase font-bold text-slate-400 block tracking-wider">Marca Oficial:</span>
-                      <span className="font-mono text-xl font-bold text-slate-900">
+                    <div className="mt-4 pt-3 border-t border-slate-200">
+                      <span className="text-[10px] uppercase font-bold text-slate-500 block tracking-wider">Marca Oficial:</span>
+                      <span className="font-athletic text-2xl font-black text-slate-900 mt-0.5 block">
                         {silverWinner?.markFormatted || '--'}
                       </span>
                       {silverWinner?.tieNote && (
-                        <span className="text-[9px] text-slate-500 italic block mt-0.5">
+                        <span className="text-[9px] text-slate-600 italic block mt-1">
                           {silverWinner.tieNote}
                         </span>
                       )}
                     </div>
                   </div>
 
-                  {/* 1º LUGAR (MEDALLA DE ORO / CAMPEÓN) */}
-                  <div className="rounded-xl border border-slate-300 bg-white p-4 text-center shadow-xs flex flex-col justify-between order-1 md:order-2 border-t-2 border-t-amber-500 md:-translate-y-1">
+                  {/* 1º LUGAR (MEDALLA DE ORO / CAMPEÓN) - MÁS DESTACADO */}
+                  <div className="rounded-2xl border-2 border-amber-400 bg-gradient-to-b from-amber-50 via-amber-100/30 to-white p-5 text-center shadow-md flex flex-col justify-between order-1 md:order-2 md:-translate-y-2 relative min-h-[280px]">
+                    <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 bg-amber-500 text-slate-950 text-[11px] font-black uppercase tracking-wider px-4 py-0.5 rounded-full shadow-xs border border-amber-400">
+                      ★ CAMPEÓN ★
+                    </div>
                     <div>
-                      <div className="inline-flex items-center space-x-1 px-3 py-0.5 rounded-full border border-amber-300 text-amber-800 bg-amber-50/50 text-[10px] font-black mb-2">
-                        <span>🥇 1º LUGAR</span>
-                        <span className="text-amber-400">•</span>
-                        <span>CAMPEÓN (ORO)</span>
+                      <div className="w-14 h-14 mx-auto rounded-full bg-gradient-to-br from-amber-300 to-amber-500 border-2 border-amber-400 text-amber-950 font-athletic font-black text-2xl flex items-center justify-center shadow-xs mt-2 mb-3">
+                        🥇 1º
                       </div>
-                      <h4 className="font-black text-base sm:text-lg text-slate-900 mt-1">
+                      <h4 className="font-black text-lg sm:text-xl text-slate-900">
                         {goldWinner?.fullName || 'Por definir'}
                       </h4>
-                      <p className="text-xs font-medium text-slate-600 mt-0.5">
+                      <p className="text-xs sm:text-sm text-slate-600 font-semibold mt-1">
                         {goldWinner?.schoolName || 'Escuela Primaria'}
                       </p>
                       {goldWinner?.bibNumber && (
-                        <span className="inline-block mt-1 font-mono text-[10px] font-bold text-amber-900 bg-amber-50 px-2.5 py-0.5 rounded border border-amber-200">
+                        <span className="inline-block mt-2 font-mono text-[11px] font-bold text-amber-950 bg-amber-100/80 px-3 py-0.5 rounded-md border border-amber-300 shadow-2xs">
                           Dorsal #{goldWinner.bibNumber}
                         </span>
                       )}
                     </div>
-                    <div className="mt-3 pt-2.5 border-t border-slate-100">
-                      <span className="text-[9px] uppercase font-bold text-amber-800 block tracking-wider">Marca Oficial:</span>
-                      <span className="font-mono text-2xl font-black text-slate-900">
+                    <div className="mt-4 pt-3 border-t border-amber-200">
+                      <span className="text-[10px] uppercase font-bold text-amber-800 block tracking-wider">Marca Oficial:</span>
+                      <span className="font-athletic text-3xl font-black text-slate-950 mt-0.5 block">
                         {goldWinner?.markFormatted || '--'}
                       </span>
                       {goldWinner?.tieNote && (
-                        <span className="text-[9px] text-amber-700 italic block mt-0.5">
+                        <span className="text-[9px] text-amber-800 italic block mt-1">
                           {goldWinner.tieNote}
                         </span>
                       )}
@@ -209,32 +212,33 @@ export default function AwardPresentationSheetModal({
                   </div>
 
                   {/* 3º LUGAR (MEDALLA DE BRONCE) */}
-                  <div className="rounded-xl border border-slate-200 bg-white p-4 text-center shadow-2xs flex flex-col justify-between order-3 border-t-2 border-t-amber-700/60">
+                  <div className="rounded-2xl border-2 border-amber-600/40 bg-gradient-to-b from-amber-50/60 to-white p-5 text-center shadow-xs flex flex-col justify-between order-3 relative min-h-[260px]">
+                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-amber-700 text-amber-50 text-[10px] font-black uppercase tracking-wider px-3.5 py-0.5 rounded-full shadow-2xs border border-amber-600">
+                      TERCER LUGAR
+                    </div>
                     <div>
-                      <div className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full border border-amber-200 text-amber-900 text-[10px] font-bold mb-2">
-                        <span>🥉 3º LUGAR</span>
-                        <span className="text-amber-400">•</span>
-                        <span>BRONCE</span>
+                      <div className="w-12 h-12 mx-auto rounded-full bg-gradient-to-br from-amber-600 to-amber-700 border-2 border-amber-600 text-amber-100 font-athletic font-black text-xl flex items-center justify-center shadow-2xs mt-2 mb-3">
+                        🥉 3º
                       </div>
-                      <h4 className="font-bold text-sm sm:text-base text-slate-900 mt-1">
+                      <h4 className="font-bold text-base sm:text-lg text-slate-900">
                         {bronzeWinner?.fullName || 'Por definir'}
                       </h4>
-                      <p className="text-xs text-slate-500 mt-0.5">
+                      <p className="text-xs text-slate-600 font-medium mt-1">
                         {bronzeWinner?.schoolName || 'Escuela Primaria'}
                       </p>
                       {bronzeWinner?.bibNumber && (
-                        <span className="inline-block mt-1 font-mono text-[10px] font-semibold text-slate-600 bg-slate-50 px-2 py-0.5 rounded border border-slate-200">
+                        <span className="inline-block mt-2 font-mono text-[11px] font-bold text-amber-900 bg-white px-2.5 py-0.5 rounded-md border border-amber-200 shadow-2xs">
                           Dorsal #{bronzeWinner.bibNumber}
                         </span>
                       )}
                     </div>
-                    <div className="mt-3 pt-2.5 border-t border-slate-100">
-                      <span className="text-[9px] uppercase font-bold text-slate-400 block tracking-wider">Marca Oficial:</span>
-                      <span className="font-mono text-xl font-bold text-slate-900">
+                    <div className="mt-4 pt-3 border-t border-amber-200/80">
+                      <span className="text-[10px] uppercase font-bold text-amber-800 block tracking-wider">Marca Oficial:</span>
+                      <span className="font-athletic text-2xl font-black text-slate-900 mt-0.5 block">
                         {bronzeWinner?.markFormatted || '--'}
                       </span>
                       {bronzeWinner?.tieNote && (
-                        <span className="text-[9px] text-slate-500 italic block mt-0.5">
+                        <span className="text-[9px] text-amber-800 italic block mt-1">
                           {bronzeWinner.tieNote}
                         </span>
                       )}
@@ -243,74 +247,23 @@ export default function AwardPresentationSheetModal({
                 </div>
               </div>
 
-              {/* TABLA DE FINALISTAS Y RESTO DE LUGARES (4º AL 8º) */}
-              {otherFinalists.length > 0 && (
-                <div className="space-y-1.5 pt-2">
-                  <div className="flex items-center space-x-1.5 text-slate-600 font-bold text-xs uppercase tracking-wider">
-                    <Award className="w-3.5 h-3.5 text-slate-400" />
-                    <span>Cuadro Complementario de Finalistas (4º al 8º Lugar)</span>
-                  </div>
-                  <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
-                    <table className="w-full text-left text-xs">
-                      <thead className="bg-slate-50 text-slate-600 font-bold uppercase text-[10px] border-b border-slate-200">
-                        <tr>
-                          <th className="py-2 px-3 text-center w-14">Lugar</th>
-                          <th className="py-2 px-3 text-center w-16">Dorsal</th>
-                          <th className="py-2 px-3">Nombre del Atleta</th>
-                          <th className="py-2 px-3">Escuela Primaria</th>
-                          <th className="py-2 px-3 text-center">Marca Oficial</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100 text-slate-700">
-                        {otherFinalists.map((fin) => (
-                          <tr key={fin.id} className="hover:bg-slate-50/50">
-                            <td className="py-2 px-3 text-center font-bold text-slate-800">
-                              {fin.rank ? `${fin.rank}º` : '-'}
-                            </td>
-                            <td className="py-2 px-3 text-center font-mono text-[11px] font-semibold text-slate-600">
-                              #{fin.bibNumber || 'S/N'}
-                            </td>
-                            <td className="py-2 px-3 font-semibold text-slate-900">
-                              {fin.fullName}
-                            </td>
-                            <td className="py-2 px-3 text-slate-600">
-                              {fin.schoolName}
-                            </td>
-                            <td className="py-2 px-3 text-center font-mono font-bold text-slate-900">
-                              {fin.markFormatted || '--'}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-
-              {/* PIE DE FIRMAS REGLAMENTARIAS Y SELLO */}
-              <div className="pt-6 border-t border-slate-200 grid grid-cols-1 sm:grid-cols-3 gap-6 items-end text-center text-xs">
+              {/* PIE DE FIRMAS REGLAMENTARIAS (SIN SELLO, SIMÉTRICAS Y AMPLIAS) */}
+              <div className="pt-8 border-t border-slate-200 grid grid-cols-2 gap-12 text-center text-xs">
                 <div>
-                  <div className="border-t border-slate-400 w-44 sm:w-48 mx-auto pt-1.5">
-                    <p className="font-bold text-slate-800 text-[11px]">
-                      Coordinador de Educación Física
+                  <div className="border-t border-slate-400 w-52 sm:w-64 mx-auto pt-2">
+                    <p className="font-bold text-slate-800 text-xs">
+                      Coordinador General de Educación Física
                     </p>
-                    <p className="text-[10px] text-slate-500">Supervisión Escolar Oficial</p>
-                  </div>
-                </div>
-
-                <div className="flex justify-center order-first sm:order-none">
-                  <div className="w-24 h-16 border border-dashed border-slate-300 rounded-lg flex flex-col items-center justify-center p-1 text-[9px] text-slate-400 uppercase tracking-widest">
-                    <span>Sello</span>
-                    <span>Oficial</span>
+                    <p className="text-[11px] text-slate-500 mt-0.5">Supervisión Escolar Oficial</p>
                   </div>
                 </div>
 
                 <div>
-                  <div className="border-t border-slate-400 w-44 sm:w-48 mx-auto pt-1.5">
-                    <p className="font-bold text-slate-800 text-[11px]">
+                  <div className="border-t border-slate-400 w-52 sm:w-64 mx-auto pt-2">
+                    <p className="font-bold text-slate-800 text-xs">
                       Juez Árbitro Oficial de Atletismo
                     </p>
-                    <p className="text-[10px] text-slate-500">Colegio de Jueces y Cronometraje</p>
+                    <p className="text-[11px] text-slate-500 mt-0.5">Colegio de Jueces y Cronometraje</p>
                   </div>
                 </div>
               </div>
