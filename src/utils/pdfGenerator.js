@@ -283,8 +283,9 @@ export function generateOfficialFieldSheetPDF(
 
 /**
  * Genera la Hoja Oficial de Presentación y Premiación de Lugares (Podio) en PDF
- * Diseño minimalista moderno con cuadro de honor (1º Oro, 2º Plata, 3º Bronce),
- * cuadro complementario de finalistas y firmas oficiales reglamentarias.
+ * Diseño minimalista moderno de alta legibilidad y estricto ahorro de tinta (Ink-Friendly):
+ * Fondo blanco puro, sin bloques negros ni fondos pesados, líneas finas institucionales,
+ * podio de 3 ganadores y cuadro complementario de finalistas.
  */
 export function generateAwardPresentationSheetPDF(rankedList = [], event = {}, tournamentInfo = {}, genderLabel = 'Varonil') {
   if (!rankedList || rankedList.length === 0) return;
@@ -293,46 +294,48 @@ export function generateAwardPresentationSheetPDF(rankedList = [], event = {}, t
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
 
-  // Marco exterior ceremonial en oro champán
-  doc.setDrawColor(217, 119, 6); // amber-600
-  doc.setLineWidth(1.5);
-  doc.rect(8, 8, pageWidth - 16, pageHeight - 16);
-
-  doc.setDrawColor(203, 213, 225); // slate-300
+  // Marco perimetral fino institucional (sin fondos oscuros, ahorro de tinta)
+  doc.setDrawColor(100, 116, 139); // slate-500
   doc.setLineWidth(0.4);
   doc.rect(10, 10, pageWidth - 20, pageHeight - 20);
 
-  // Encabezado institucional
-  doc.setFillColor(15, 23, 42); // slate-900
-  doc.rect(10, 10, pageWidth - 20, 22, 'F');
+  doc.setDrawColor(226, 232, 240); // slate-200
+  doc.setLineWidth(0.2);
+  doc.rect(12, 12, pageWidth - 24, pageHeight - 24);
+
+  // Encabezado institucional limpio
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7.5);
+  doc.setTextColor(100, 116, 139);
+  doc.text('SUPERVISIÓN GENERAL DE EDUCACIÓN FÍSICA  •  COMITÉ ORGANIZADOR', pageWidth / 2, 17.5, { align: 'center' });
 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(14);
-  doc.setTextColor(255, 255, 255);
-  doc.text(String(tournamentInfo.name || 'JUEGOS DEPORTIVOS ESCOLARES DE ATLETISMO 2026').toUpperCase(), pageWidth / 2, 18, { align: 'center' });
+  doc.setTextColor(15, 23, 42); // slate-900
+  doc.text(String(tournamentInfo.name || 'JUEGOS DEPORTIVOS ESCOLARES DE ATLETISMO').toUpperCase(), pageWidth / 2, 24, { align: 'center' });
 
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(10);
-  doc.setTextColor(251, 191, 36); // amber-400
-  doc.text('HOJA TÉCNICA OFICIAL DE PREMIACIÓN Y PODIO DE HONOR', pageWidth / 2, 26, { align: 'center' });
+  doc.setFontSize(9.5);
+  doc.setTextColor(71, 85, 105); // slate-600
+  doc.text('CÉDULA OFICIAL DE PREMIACIÓN Y PODIO DE HONOR', pageWidth / 2, 29.5, { align: 'center' });
 
-  // Cinta de metadatos de la prueba
-  doc.setFillColor(248, 250, 252); // slate-50
-  doc.rect(10, 32, pageWidth - 20, 12, 'F');
-  doc.setDrawColor(226, 232, 240);
-  doc.setLineWidth(0.3);
-  doc.line(10, 44, pageWidth - 10, 44);
+  // Cinta de metadatos de la prueba (líneas finas, fondo blanco)
+  doc.setDrawColor(203, 213, 225);
+  doc.setLineWidth(0.25);
+  doc.line(16, 33, pageWidth - 16, 33);
+  doc.line(16, 42, pageWidth - 16, 42);
 
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(9);
+  doc.setFontSize(8);
   doc.setTextColor(30, 41, 59);
   const eventName = (event.name || 'Prueba Oficial').toUpperCase();
-  doc.text(`PRUEBA: ${eventName}`, 16, 39.5);
-  doc.text(`RAMA: ${genderLabel.toUpperCase()}`, 115, 39.5);
+  doc.text(`PRUEBA: ${eventName}`, 20, 38.5);
+  doc.text(`RAMA: ${genderLabel.toUpperCase()}`, 105, 38.5);
+
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(71, 85, 105);
-  doc.text(`SEDE: ${tournamentInfo.venue || 'Estadio Escolar'}`, 185, 39.5);
-  doc.text(`FECHA: ${tournamentInfo.date || '2026'}`, 245, 39.5);
+  doc.text(`FECHA: ${tournamentInfo.date || '2026'}`, 175, 38.5);
+  doc.text(`SEDE: ${tournamentInfo.venue || 'Estadio Escolar'}`, 225, 38.5);
 
   // Cuadro de Honor: 3 Cajas de Podio (Plata - Oro - Bronce)
   const goldWinner = rankedList[0];
@@ -340,8 +343,8 @@ export function generateAwardPresentationSheetPDF(rankedList = [], event = {}, t
   const bronzeWinner = rankedList[2];
 
   const colWidth = 78;
-  const colHeight = 52;
-  const startY = 48;
+  const colHeight = 50;
+  const startY = 46;
   const startX = 16;
 
   const getMarkText = (w) => {
@@ -352,98 +355,84 @@ export function generateAwardPresentationSheetPDF(rankedList = [], event = {}, t
     return w.status ? w.status.toUpperCase() : '--';
   };
 
-  const drawWinnerBox = (x, y, w, h, title, medalColor, athlete, isChampion) => {
-    // Fondo de tarjeta
-    doc.setFillColor(medalColor.bg[0], medalColor.bg[1], medalColor.bg[2]);
-    doc.roundedRect(x, y, w, h, 3, 3, 'F');
+  const drawWinnerBox = (x, y, w, h, title, accentColor, athlete, isChampion) => {
+    // Fondo de tarjeta blanco puro (ahorro de tinta)
+    doc.setFillColor(255, 255, 255);
+    doc.roundedRect(x, y, w, h, 2, 2, 'F');
 
-    // Borde
-    doc.setDrawColor(medalColor.border[0], medalColor.border[1], medalColor.border[2]);
-    doc.setLineWidth(isChampion ? 1 : 0.6);
-    doc.roundedRect(x, y, w, h, 3, 3, 'S');
+    // Borde fino limpio
+    doc.setDrawColor(203, 213, 225);
+    doc.setLineWidth(0.3);
+    doc.roundedRect(x, y, w, h, 2, 2, 'S');
 
-    // Insignia superior
-    doc.setFillColor(medalColor.badge[0], medalColor.badge[1], medalColor.badge[2]);
-    doc.roundedRect(x + (w / 2) - 30, y - 3, 60, 6, 2, 2, 'F');
+    // Acento superior discreto
+    doc.setDrawColor(accentColor[0], accentColor[1], accentColor[2]);
+    doc.setLineWidth(isChampion ? 0.9 : 0.6);
+    doc.line(x + 4, y, x + w - 4, y);
+
+    // Título / Insignia de lugar (texto sobrio, sin plastas de color)
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(7.5);
-    doc.setTextColor(medalColor.text[0], medalColor.text[1], medalColor.text[2]);
-    doc.text(title, x + (w / 2), y + 1.2, { align: 'center' });
+    doc.setTextColor(accentColor[0], accentColor[1], accentColor[2]);
+    doc.text(title, x + (w / 2), y + 6, { align: 'center' });
 
     if (athlete) {
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(isChampion ? 11 : 10);
+      doc.setFontSize(isChampion ? 10.5 : 9.5);
       doc.setTextColor(15, 23, 42);
       const name = String(athlete.fullName || 'Atleta').toUpperCase();
-      doc.text(name, x + (w / 2), y + 13, { align: 'center', maxWidth: w - 8 });
+      doc.text(name, x + (w / 2), y + 14, { align: 'center', maxWidth: w - 8 });
 
       doc.setFont('helvetica', 'normal');
-      doc.setFontSize(8);
+      doc.setFontSize(7.5);
       doc.setTextColor(71, 85, 105);
       const school = athlete.schoolName || 'Escuela Primaria';
-      doc.text(school, x + (w / 2), y + 19, { align: 'center', maxWidth: w - 8 });
-
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(8);
-      doc.setTextColor(100, 116, 139);
-      doc.text(`DORSAL: #${athlete.bibNumber || 'S/N'}`, x + (w / 2), y + 25, { align: 'center' });
-
-      doc.setDrawColor(medalColor.border[0], medalColor.border[1], medalColor.border[2]);
-      doc.setLineWidth(0.2);
-      doc.line(x + 10, y + 29, x + w - 10, y + 29);
+      doc.text(school, x + (w / 2), y + 20, { align: 'center', maxWidth: w - 8 });
 
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(7);
       doc.setTextColor(100, 116, 139);
-      doc.text('MARCA OFICIAL / TIEMPO:', x + (w / 2), y + 34, { align: 'center' });
+      doc.text(`Dorsal: #${athlete.bibNumber || 'S/N'}`, x + (w / 2), y + 25, { align: 'center' });
+
+      // Línea divisoria muy fina
+      doc.setDrawColor(226, 232, 240);
+      doc.setLineWidth(0.2);
+      doc.line(x + 10, y + 28, x + w - 10, y + 28);
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(6.5);
+      doc.setTextColor(100, 116, 139);
+      doc.text('MARCA OFICIAL / TIEMPO:', x + (w / 2), y + 33, { align: 'center' });
 
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(isChampion ? 15 : 13);
-      doc.setTextColor(medalColor.markColor[0], medalColor.markColor[1], medalColor.markColor[2]);
-      doc.text(getMarkText(athlete), x + (w / 2), y + 43, { align: 'center' });
+      doc.setFontSize(isChampion ? 13 : 12);
+      doc.setTextColor(15, 23, 42);
+      doc.text(getMarkText(athlete), x + (w / 2), y + 41, { align: 'center' });
 
       if (athlete.tieNote) {
         doc.setFont('helvetica', 'italic');
-        doc.setFontSize(6.5);
+        doc.setFontSize(6);
         doc.setTextColor(100, 116, 139);
-        doc.text(athlete.tieNote, x + (w / 2), y + 48, { align: 'center' });
+        doc.text(athlete.tieNote, x + (w / 2), y + 46, { align: 'center' });
       }
     } else {
       doc.setFont('helvetica', 'italic');
-      doc.setFontSize(9);
+      doc.setFontSize(8.5);
       doc.setTextColor(148, 163, 184);
       doc.text('Pendiente por definir', x + (w / 2), y + 26, { align: 'center' });
     }
   };
 
   // 2º LUGAR (PLATA) - Columna Izquierda
-  drawWinnerBox(startX, startY, colWidth, colHeight, '2º LUGAR - MEDALLA DE PLATA', {
-    bg: [248, 250, 252],
-    border: [148, 163, 184],
-    badge: [226, 232, 240],
-    text: [51, 65, 85],
-    markColor: [51, 65, 85]
-  }, silverWinner, false);
+  drawWinnerBox(startX, startY, colWidth, colHeight, '2º LUGAR  •  SUB-CAMPEÓN (PLATA)', [100, 116, 139], silverWinner, false);
 
   // 1º LUGAR (ORO) - Columna Centro
-  drawWinnerBox(startX + colWidth + 5, startY, colWidth + 8, colHeight, '1º LUGAR - MEDALLA DE ORO', {
-    bg: [254, 252, 232],
-    border: [217, 119, 6],
-    badge: [251, 191, 36],
-    text: [69, 26, 3],
-    markColor: [180, 83, 9]
-  }, goldWinner, true);
+  drawWinnerBox(startX + colWidth + 5, startY, colWidth + 8, colHeight, '1º LUGAR  •  CAMPEÓN (ORO)', [217, 119, 6], goldWinner, true);
 
   // 3º LUGAR (BRONCE) - Columna Derecha
-  drawWinnerBox(startX + colWidth + 5 + colWidth + 13, startY, colWidth, colHeight, '3º LUGAR - MEDALLA DE BRONCE', {
-    bg: [255, 247, 237],
-    border: [180, 83, 9],
-    badge: [254, 215, 170],
-    text: [124, 45, 18],
-    markColor: [124, 45, 18]
-  }, bronzeWinner, false);
+  drawWinnerBox(startX + colWidth + 5 + colWidth + 13, startY, colWidth, colHeight, '3º LUGAR  •  TERCER LUGAR (BRONCE)', [180, 83, 9], bronzeWinner, false);
 
-  // Tabla compacta de Finalistas (4º al 8º Lugar)
+  // Tabla compacta de Finalistas (4º al 8º Lugar) - Diseño editorial ink-friendly
   const otherFinalists = rankedList.slice(3, 8);
   if (otherFinalists.length > 0) {
     const tableBody = otherFinalists.map(ath => [
@@ -455,12 +444,12 @@ export function generateAwardPresentationSheetPDF(rankedList = [], event = {}, t
     ]);
 
     autoTable(doc, {
-      startY: startY + colHeight + 5,
+      startY: startY + colHeight + 4,
       head: [['Lugar', 'Dorsal', 'Finalista (Nombre del Alumno)', 'Escuela Primaria', 'Marca Oficial']],
       body: tableBody,
-      theme: 'grid',
-      styles: { fontSize: 7.5, cellPadding: 1.5, textColor: [30, 41, 59] },
-      headStyles: { fillColor: [51, 65, 85], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 7.5 },
+      theme: 'plain',
+      styles: { fontSize: 7.5, cellPadding: 1.5, textColor: [30, 41, 59], fillColor: [255, 255, 255], lineWidth: 0.1, lineColor: [226, 232, 240] },
+      headStyles: { fillColor: [248, 250, 252], textColor: [51, 65, 85], fontStyle: 'bold', fontSize: 7, halign: 'center', lineWidth: 0.15, lineColor: [203, 213, 225] },
       columnStyles: {
         0: { cellWidth: 16, halign: 'center', fontStyle: 'bold' },
         1: { cellWidth: 16, halign: 'center' },
@@ -472,18 +461,40 @@ export function generateAwardPresentationSheetPDF(rankedList = [], event = {}, t
     });
   }
 
-  // Firmas reglamentarias
-  const footY = 188;
-  doc.setDrawColor(100, 116, 139);
-  doc.setLineWidth(0.3);
-  doc.line(30, footY, 95, footY);
-  doc.line(pageWidth - 95, footY, pageWidth - 30, footY);
+  // Firmas reglamentarias y cuadro de sello oficial
+  const footY = 186;
+  doc.setDrawColor(148, 163, 184);
+  doc.setLineWidth(0.35);
+  doc.line(25, footY, 95, footY);
+  doc.line(pageWidth - 95, footY, pageWidth - 25, footY);
 
-  doc.setFontSize(8);
+  doc.setFontSize(7.5);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(30, 41, 59);
+  doc.text('Coordinador General de Educación Física', 60, footY + 4, { align: 'center' });
+  doc.text('Juez Árbitro Oficial de Atletismo', pageWidth - 60, footY + 4, { align: 'center' });
+
+  doc.setFontSize(6.5);
   doc.setFont('helvetica', 'normal');
-  doc.setTextColor(71, 85, 105);
-  doc.text('Coordinador General de Educación Física', 62.5, footY + 4, { align: 'center' });
-  doc.text('Juez Árbitro Oficial de Atletismo', pageWidth - 62.5, footY + 4, { align: 'center' });
+  doc.setTextColor(100, 116, 139);
+  doc.text('Supervisión Escolar Oficial', 60, footY + 7.5, { align: 'center' });
+  doc.text('Colegio de Jueces y Cronometraje', pageWidth - 60, footY + 7.5, { align: 'center' });
+
+  // Cuadro discreto de Sello Oficial
+  const stampW = 26;
+  const stampH = 18;
+  const stampX = (pageWidth / 2) - (stampW / 2);
+  const stampY = footY - 12;
+  doc.setDrawColor(203, 213, 225);
+  doc.setLineWidth(0.2);
+  doc.setLineDashPattern([1.5, 1.5], 0);
+  doc.rect(stampX, stampY, stampW, stampH);
+  doc.setLineDashPattern([], 0);
+
+  doc.setFontSize(6.5);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(148, 163, 184);
+  doc.text('SELLO OFICIAL', pageWidth / 2, stampY + 10, { align: 'center' });
 
   doc.save(`Hoja_Premiacion_${event.shortName || 'Oficial'}.pdf`);
 }
