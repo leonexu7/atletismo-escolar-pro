@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   School,
   Search,
@@ -23,21 +23,28 @@ export default function SchoolSelectorModal({
   onSelectSchool,
   onSaveSchool
 }) {
-  const [activeTab, setActiveTab] = useState('select'); // 'select' | 'new'
+  const [activeTab, setActiveTab] = useState(() => (schools.length === 0 ? 'new' : 'select')); // 'select' | 'new'
   const [searchTerm, setSearchTerm] = useState('');
 
-  // Formulario para registrar nueva escuela
+  // Formulario para registrar nueva escuela (todos los campos vacíos sin prellenado)
   const [newSchoolForm, setNewSchoolForm] = useState({
     name: '',
     cct: '',
-    zone: 'Zona Escolar 04',
-    inspection: 'Inspección 12',
+    zone: '',
+    inspection: '',
     coachName: ''
   });
 
   const [coachNameForSelect, setCoachNameForSelect] = useState(
     currentSchool?.coachName || ''
   );
+
+  useEffect(() => {
+    if (isOpen) {
+      setActiveTab(schools.length === 0 ? 'new' : 'select');
+      setCoachNameForSelect(currentSchool?.coachName || '');
+    }
+  }, [isOpen, schools.length, currentSchool?.coachName]);
 
   // Detección reactiva de duplicados al capturar una nueva escuela
   const duplicateMatch = useMemo(() => {
@@ -120,6 +127,13 @@ export default function SchoolSelectorModal({
 
     onSaveSchool(newSchool);
     onSelectSchool(newSchool);
+    setNewSchoolForm({
+      name: '',
+      cct: '',
+      zone: '',
+      inspection: '',
+      coachName: ''
+    });
     onClose();
   };
 

@@ -14,6 +14,7 @@ import {
   loadTournamentState,
   saveTournamentState,
   purgeAllTournamentData,
+  clearSavedTeacherSchool,
   DEFAULT_TOURNAMENT_INFO,
   STORAGE_KEY
 } from './utils/storage';
@@ -73,6 +74,7 @@ export default function App() {
           setState(prev => {
             // Si en Firebase se ordenó vaciar el torneo a ceros (isPurged)
             if (cloudData.isPurged) {
+              clearSavedTeacherSchool();
               return {
                 ...prev,
                 athletes: [],

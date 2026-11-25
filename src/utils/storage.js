@@ -4,6 +4,17 @@
  */
 
 export const STORAGE_KEY = 'atletismo_escolar_pro_v1';
+export const SAVED_SCHOOL_ID_KEY = 'atletismo_saved_school_id';
+export const SAVED_SCHOOL_INFO_KEY = 'atletismo_saved_school_info';
+
+export function clearSavedTeacherSchool() {
+  try {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.removeItem(SAVED_SCHOOL_ID_KEY);
+      localStorage.removeItem(SAVED_SCHOOL_INFO_KEY);
+    }
+  } catch (_) {}
+}
 
 export const DEFAULT_TOURNAMENT_INFO = {
   id: 'juegos-escolares-2026',
@@ -114,6 +125,8 @@ export function importTournamentFromFile(file) {
 export function purgeAllTournamentData(currentCloudSession = null) {
   if (typeof localStorage !== 'undefined') {
     localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(SAVED_SCHOOL_ID_KEY);
+    localStorage.removeItem(SAVED_SCHOOL_INFO_KEY);
   }
 
   // Mantener la conexión a la nube activa por defecto (NO desconectar) para sincronizar el vaciado en Firebase
