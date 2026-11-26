@@ -19,7 +19,8 @@ export function generateOfficialTrackSheetPDF(
   heats = [],
   tournamentInfo = {},
   trackEntries = [],
-  rankedAthletes = []
+  rankedAthletes = [],
+  genderLabel = ''
 ) {
   const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'letter' });
   const pageWidth = doc.internal.pageSize.getWidth();
@@ -36,14 +37,15 @@ export function generateOfficialTrackSheetPDF(
   doc.setFontSize(10);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(226, 232, 240);
-  doc.text(`PLANILLA TÉCNICA OFICIAL DE PISTA  |  PRUEBA: ${String(event.name || '').toUpperCase()}`, 14, 18);
+  const ramaText = genderLabel ? `  |  RAMA: ${String(genderLabel).toUpperCase()}` : '';
+  doc.text(`PLANILLA TÉCNICA OFICIAL DE PISTA  |  PRUEBA: ${String(event.name || '').toUpperCase()}${ramaText}`, 14, 18);
 
   // Metadatos del evento
   doc.setTextColor(30, 41, 59);
   doc.setFontSize(9);
-  doc.text(`Sede: ${tournamentInfo.venue || 'Estadio Escolar'}`, 14, 30);
+  doc.text(`Sede: ${tournamentInfo.venue || 'Estadio Escolar'}`, 14, 30, { maxWidth: 100 });
   doc.text(`Fecha: ${tournamentInfo.date || ''}`, 120, 30);
-  doc.text(`Organizador: ${tournamentInfo.organizer || 'Comité Organizador'}`, 200, 30);
+  doc.text(`Organizador: ${tournamentInfo.organizer || 'Comité Organizador'}`, 175, 30, { maxWidth: 90 });
 
   let currentY = 34;
 
@@ -53,6 +55,13 @@ export function generateOfficialTrackSheetPDF(
     doc.text('No hay series configuradas para esta prueba.', 14, 45);
   } else {
     heats.forEach((heat, heatIdx) => {
+      const lanesCountInHeat = (heat.lanes || []).length || 1;
+      const estimatedHeatHeight = 16 + Math.min(lanesCountInHeat, 4) * 8;
+      if (heatIdx > 0 && currentY + estimatedHeatHeight > 192) {
+        doc.addPage();
+        currentY = 20;
+      }
+
       // Subtítulo de Serie
       doc.setFontSize(11);
       doc.setFont('helvetica', 'bold');
@@ -81,8 +90,12 @@ export function generateOfficialTrackSheetPDF(
           }
         }
 
-        if (ranked && ranked.rank) {
-          placeDisplay = `${ranked.rank}º`;
+        if (ranked && ranked.rank !== undefined && ranked.rank !== null) {
+          if (typeof ranked.rank === 'number') {
+            placeDisplay = `${ranked.rank}º`;
+          } else if (ranked.rank !== 'Pendiente' && ranked.rank !== 'PENDING') {
+            placeDisplay = String(ranked.rank);
+          }
         }
 
         return [
@@ -101,12 +114,13 @@ export function generateOfficialTrackSheetPDF(
         head: [['Carril', 'Dorsal', 'Nombre del Alumno / Corredor', 'Escuela de Procedencia', 'Tiempo Oficial', 'Lugar', 'Notas / Faltas']],
         body: tableBody,
         theme: 'grid',
-        styles: { fontSize: 8.5, cellPadding: 2 },
+        rowPageBreak: 'avoid',
+        styles: { fontSize: 8.5, cellPadding: 2, overflow: 'linebreak' },
         headStyles: { fillColor: [30, 41, 59], textColor: [255, 255, 255], fontStyle: 'bold', halign: 'center' },
         columnStyles: {
           0: { cellWidth: 14, halign: 'center' },
-          1: { cellWidth: 16, halign: 'center', fontStyle: 'bold' },
-          2: { cellWidth: 68 },
+          1: { cellWidth: 18, halign: 'center', fontStyle: 'bold' },
+          2: { cellWidth: 66 },
           3: { cellWidth: 58 },
           4: { cellWidth: 28, halign: 'center', fontStyle: 'bold' },
           5: { cellWidth: 16, halign: 'center', fontStyle: 'bold' },
@@ -155,7 +169,8 @@ export function generateOfficialFieldSheetPDF(
   flight = [],
   tournamentInfo = {},
   fieldEntries = [],
-  rankedAthletes = []
+  rankedAthletes = [],
+  genderLabel = ''
 ) {
   const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'letter' });
   const pageWidth = doc.internal.pageSize.getWidth();
@@ -172,12 +187,13 @@ export function generateOfficialFieldSheetPDF(
   doc.setFontSize(10);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(209, 250, 229);
-  doc.text(`PLANILLA OFICIAL DE CONCURSO DE CAMPO  |  PRUEBA: ${String(event.name || '').toUpperCase()}`, 14, 18);
+  const ramaText = genderLabel ? `  |  RAMA: ${String(genderLabel).toUpperCase()}` : '';
+  doc.text(`PLANILLA OFICIAL DE CONCURSO DE CAMPO  |  PRUEBA: ${String(event.name || '').toUpperCase()}${ramaText}`, 14, 18);
 
   // Metadatos
   doc.setTextColor(30, 41, 59);
   doc.setFontSize(9);
-  doc.text(`Sede: ${tournamentInfo.venue || 'Campo Escolar'}`, 14, 30);
+  doc.text(`Sede: ${tournamentInfo.venue || 'Campo Escolar'}`, 14, 30, { maxWidth: 92 });
   doc.text(`Reglamento: 3 Intentos oficiales. Gana la MEJOR marca válida.`, 110, 30);
   doc.text(`Fecha: ${tournamentInfo.date || ''}`, 220, 30);
 
@@ -185,12 +201,15 @@ export function generateOfficialFieldSheetPDF(
     const entry = (fieldEntries || []).find(e => e.athleteId === athlete.id);
     const ranked = (rankedAthletes || []).find(r => r.id === athlete.id);
 
-    const attempts = entry?.attempts || ranked?.attempts || [];
+    const attempts = entry?.attempts?.length
+      ? entry.attempts
+      : (ranked?.attemptsDetails?.length ? ranked.attemptsDetails : (ranked?.attempts || []));
     const getAttemptStr = (att) => {
       if (!att) return '';
       if (att.status === 'foul') return 'X';
       if (att.status === 'pass') return '-';
-      if (att.value !== null && att.value !== undefined && att.value !== '') {
+      if (att.status === 'dns') return 'DNS';
+      if (att.value !== null && att.value !== undefined && att.value !== '' && Number(att.value) > 0) {
         return formatFieldDistance(att.value);
       }
       return '';
@@ -200,15 +219,22 @@ export function generateOfficialFieldSheetPDF(
     const att2 = getAttemptStr(attempts[1]);
     const att3 = getAttemptStr(attempts[2]);
 
-    const bestMarkStr = ranked?.bestMark !== null && ranked?.bestMark !== undefined
+    const bestMarkStr = ranked?.hasValidMark && ranked?.bestMark > 0
       ? formatFieldDistance(ranked.bestMark)
-      : (entry?.bestMark ? formatFieldDistance(entry.bestMark) : '');
+      : (entry?.bestMark > 0 ? formatFieldDistance(entry.bestMark) : '');
 
-    const secondBestStr = ranked?.secondBestMark !== null && ranked?.secondBestMark !== undefined
+    const secondBestStr = ranked?.hasValidMark && ranked?.secondBestMark > 0
       ? formatFieldDistance(ranked.secondBestMark)
       : '';
 
-    const placeStr = ranked?.rank ? `${ranked.rank}º` : '';
+    let placeStr = '';
+    if (ranked?.rank !== undefined && ranked?.rank !== null) {
+      if (typeof ranked.rank === 'number') {
+        placeStr = `${ranked.rank}º`;
+      } else if (ranked.rank !== 'Pendiente' && ranked.rank !== 'PENDING') {
+        placeStr = String(ranked.rank);
+      }
+    }
 
     return [
       idx + 1,
@@ -240,6 +266,7 @@ export function generateOfficialFieldSheetPDF(
     ]],
     body: tableBody,
     theme: 'grid',
+    rowPageBreak: 'avoid',
     styles: { fontSize: 8, cellPadding: 2, overflow: 'linebreak' },
     headStyles: { fillColor: [4, 120, 87], textColor: [255, 255, 255], fontStyle: 'bold', halign: 'center' },
     columnStyles: {
@@ -323,34 +350,34 @@ export function generateAwardPresentationSheetPDF(rankedList = [], event = {}, t
   doc.setTextColor(4, 120, 87); // emerald-700
   doc.text('CÉDULA CERTIFICADA  •  VALIDEZ OFICIAL', pageWidth - 18, 16.5, { align: 'right' });
 
-  // Encabezado institucional elegante
+  // Encabezado institucional elegante (solo caracteres WinAnsi seguros)
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8.5);
   doc.setTextColor(180, 83, 9); // amber-700
-  doc.text('★ CÉDULA OFICIAL DE PREMIACIÓN Y PODIO DE HONOR ★', pageWidth / 2, 21, { align: 'center' });
+  doc.text('CÉDULA OFICIAL DE PREMIACIÓN Y PODIO DE HONOR', pageWidth / 2, 21, { align: 'center' });
 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(15.5);
   doc.setTextColor(15, 23, 42); // slate-900
   doc.text(String(tournamentInfo.name || 'JUEGOS DEPORTIVOS ESCOLARES DE ATLETISMO').toUpperCase(), pageWidth / 2, 28, { align: 'center' });
 
-  // Micro-detalle 3: Divisor clásico con rombo central (vector fino)
+  // Micro-detalle 3: Divisor clásico con rombo central vectorial puro (sin Unicode corrupto)
   const divCenterY = 31.5;
+  const cx = pageWidth / 2;
   doc.setDrawColor(245, 158, 11);
   doc.setLineWidth(0.25);
-  doc.line(pageWidth / 2 - 28, divCenterY, pageWidth / 2 - 4, divCenterY);
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(7);
-  doc.setTextColor(217, 119, 6);
-  doc.text('❖', pageWidth / 2, divCenterY + 1, { align: 'center' });
-  doc.line(pageWidth / 2 + 4, divCenterY, pageWidth / 2 + 28, divCenterY);
+  doc.line(cx - 32, divCenterY, cx - 4.5, divCenterY);
+  doc.setFillColor(217, 119, 6);
+  doc.triangle(cx, divCenterY - 1.6, cx - 1.6, divCenterY, cx + 1.6, divCenterY, 'F');
+  doc.triangle(cx, divCenterY + 1.6, cx - 1.6, divCenterY, cx + 1.6, divCenterY, 'F');
+  doc.line(cx + 4.5, divCenterY, cx + 32, divCenterY);
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8.5);
   doc.setTextColor(71, 85, 105); // slate-600
   doc.text(String(tournamentInfo.organizer || 'Comité Organizador y Supervisión General de Educación Física'), pageWidth / 2, 36, { align: 'center' });
 
-  // Cinta de metadatos de la prueba con fondo pastel suave
+  // Cinta de metadatos de la prueba con fondo pastel suave (ajustada dentro de márgenes)
   doc.setFillColor(248, 250, 252);
   doc.roundedRect(18, 39, pageWidth - 36, 11, 2, 2, 'F');
   doc.setDrawColor(226, 232, 240);
@@ -359,19 +386,19 @@ export function generateAwardPresentationSheetPDF(rankedList = [], event = {}, t
 
   const eventName = (event.name || 'Prueba Oficial').toUpperCase();
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(8.5);
+  doc.setFontSize(8);
   doc.setTextColor(185, 28, 28); // rose-700
-  doc.text(`PRUEBA: ${eventName}`, 24, 45.8);
+  doc.text(`PRUEBA: ${eventName}`, 22, 45.8, { maxWidth: 82 });
 
   doc.setTextColor(3, 105, 161); // sky-700
-  doc.text(`RAMA: ${genderLabel.toUpperCase()}`, 110, 45.8);
+  doc.text(`RAMA: ${String(genderLabel || 'OFICIAL').toUpperCase()}`, 106, 45.8, { maxWidth: 42 });
 
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(180, 83, 9); // amber-700
-  doc.text(`FECHA: ${tournamentInfo.date || '2026'}`, 180, 45.8);
+  doc.text(`FECHA: ${tournamentInfo.date || '2026'}`, 150, 45.8, { maxWidth: 38 });
 
   doc.setTextColor(4, 120, 87); // emerald-700
-  doc.text(`SEDE: ${tournamentInfo.venue || 'Estadio Escolar'}`, 230, 45.8);
+  doc.text(`SEDE: ${String(tournamentInfo.venue || 'Estadio Escolar')}`, pageWidth - 22, 45.8, { align: 'right', maxWidth: 68 });
 
   // Cuadro de Honor: 3 Cajas de Podio Exclusivas (Plata - Oro - Bronce)
   const goldWinner = rankedList[0];
@@ -487,20 +514,21 @@ export function generateAwardPresentationSheetPDF(rankedList = [], event = {}, t
     doc.setLineWidth(1.2);
     doc.roundedRect(x, y, w, h, 3, 3, 'S');
 
-    // Micro-detalle: Marcadores de esquina dorados
+    // Micro-detalle: Marcadores de esquina dorados (WinAnsi)
     doc.setFont('times', 'bold');
-    doc.setFontSize(8);
-    doc.setTextColor(217, 119, 6);
-    doc.text('★ I ★', x + 5, y + 6.5);
-    doc.text('★ I ★', x + w - 5, y + 6.5, { align: 'right' });
-
-    // Cinta superior dorada
-    doc.setFillColor(217, 119, 6);
-    doc.roundedRect(x + (w / 2) - 31, y - 4, 62, 8, 2, 2, 'F');
-    doc.setFont('helvetica', 'bold');
     doc.setFontSize(8.5);
+    doc.setTextColor(217, 119, 6);
+    doc.text('I', x + 5, y + 6.5);
+    doc.text('I', x + w - 5, y + 6.5, { align: 'right' });
+
+    // Cinta superior dorada ensanchada para evitar desbordamiento
+    doc.setFillColor(217, 119, 6);
+    doc.roundedRect(x + (w / 2) - 36, y - 4, 72, 8, 2, 2, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8);
     doc.setTextColor(255, 255, 255);
-    doc.text('★ 1º LUGAR • CAMPEÓN (ORO) ★', x + (w / 2), y + 1.5, { align: 'center' });
+    const isFemaleTitle = String(genderLabel || '').toLowerCase().includes('fem') && !event?.id?.includes('relevo');
+    doc.text(isFemaleTitle ? '1º LUGAR • CAMPEONA (ORO)' : '1º LUGAR • CAMPEÓN (ORO)', x + (w / 2), y + 1.5, { align: 'center' });
 
     // Medallón dorado
     doc.setFillColor(251, 191, 36);

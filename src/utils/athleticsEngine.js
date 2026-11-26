@@ -5,7 +5,7 @@
  * - Agregador de progreso en vivo para la Mesa de Control
  */
 
-import { OFFICIAL_EVENTS, isFieldEvent, isTrackEvent } from '../constants/events.js';
+import { OFFICIAL_EVENTS, isFieldEvent, isTrackEvent, isRelayEvent } from '../constants/events.js';
 import { evaluateFieldAttempts, rankFieldEventCompetitors, rankTrackEventRunners } from './tieBreaker.js';
 
 /**
@@ -76,59 +76,123 @@ export function generateFieldFlight(athletesList = []) {
   }));
 }
 
+function computeSubsetProgress(participantsList, entriesList, isField, isAwardedFlag) {
+  const participantIdSet = new Set(participantsList.map(p => p.id));
+  const dedupedEntriesMap = new Map();
+
+  (entriesList || []).forEach(entry => {
+    const entryId = entry?.athleteId || entry?.id;
+    if (!entryId) return;
+    if (participantIdSet.size > 0 && !participantIdSet.has(entryId)) return;
+    dedupedEntriesMap.set(entryId, entry);
+  });
+
+  const relevantEntries = Array.from(dedupedEntriesMap.values());
+  const totalParticipants = participantsList.length > 0
+    ? Math.max(participantsList.length, relevantEntries.length)
+    : relevantEntries.length;
+
+  let completedCount = 0;
+  if (isField) {
+    relevantEntries.forEach(entry => {
+      const attempts = entry.attempts || [];
+      const completedAttempts = attempts.filter(
+        a => a && (a.status === 'valid' || a.status === 'foul' || a.status === 'pass' || a.status === 'dns')
+      ).length;
+      if (completedAttempts >= 3) completedCount++;
+    });
+  } else {
+    relevantEntries.forEach(entry => {
+      if (entry.status === 'valid' || entry.status === 'dns' || entry.status === 'dnf' || entry.status === 'dq') {
+        completedCount++;
+      }
+    });
+  }
+
+  let status = 'pending';
+  if (totalParticipants > 0 && completedCount === totalParticipants) {
+    status = isAwardedFlag ? 'awarded' : 'completed';
+  } else if (completedCount > 0) {
+    status = 'in_progress';
+  }
+
+  return {
+    totalParticipants,
+    completedCount,
+    progressPercent: totalParticipants > 0 ? Math.round((completedCount / totalParticipants) * 100) : 0,
+    status,
+    isReadyForAwards: status === 'completed',
+    isAwarded: status === 'awarded'
+  };
+}
+
 /**
  * Calcula el resumen de estado de todo el torneo para el tablero de la Mesa de Control
  */
 export function computeTournamentEventStatus(eventsList = OFFICIAL_EVENTS, tournamentData = {}) {
   const results = tournamentData.results || {};
   const athletes = tournamentData.athletes || [];
-  const schools = tournamentData.schools || [];
+  const relays = tournamentData.relays || [];
+  const athleteGenderMap = new Map(athletes.map(a => [a.id, a.gender]));
 
   return eventsList.map(ev => {
-    // Filtrar atletas inscritos en este evento
-    const enrolledAthletes = athletes.filter(a => (a.eventIds || []).includes(ev.id));
     const eventResults = results[ev.id] || {};
 
-    let totalParticipants = enrolledAthletes.length;
-    let completedCount = 0;
-    let status = 'pending'; // 'pending' | 'in_progress' | 'completed' | 'awarded'
-
-    if (isFieldEvent(ev.id)) {
-      // En campo: contar cuántos tienen sus 3 intentos completados
-      const fieldData = eventResults.fieldEntries || [];
-      totalParticipants = Math.max(totalParticipants, fieldData.length);
-      
-      fieldData.forEach(entry => {
-        const attempts = entry.attempts || [];
-        const completedAttempts = attempts.filter(a => a.status === 'valid' || a.status === 'foul' || a.status === 'pass').length;
-        if (completedAttempts === 3) completedCount++;
-      });
-    } else {
-      // En pista: contar cuántos tienen tiempo registrado
+    if (isRelayEvent(ev.id)) {
+      const enrolledRelays = relays.filter(r => r.eventId === ev.id);
       const trackData = eventResults.trackEntries || [];
-      totalParticipants = Math.max(totalParticipants, trackData.length);
-      
-      trackData.forEach(entry => {
-        if (entry.status === 'valid' || entry.status === 'dns' || entry.status === 'dnf' || entry.status === 'dq') {
-          completedCount++;
-        }
-      });
+      const relayGender = ev.applicableGenders?.[0] || 'MIXED';
+      const awardedFlag =
+        Boolean(eventResults.isAwarded) ||
+        Boolean(eventResults.awardedByGender?.[relayGender]);
+      const relayProgress = computeSubsetProgress(enrolledRelays, trackData, false, awardedFlag);
+
+      return {
+        event: ev,
+        isRelay: true,
+        participantUnit: 'equipos',
+        ...relayProgress,
+        byGender: { [relayGender]: relayProgress }
+      };
     }
 
-    if (totalParticipants > 0 && completedCount === totalParticipants) {
-      status = eventResults.isAwarded ? 'awarded' : 'completed';
-    } else if (completedCount > 0) {
-      status = 'in_progress';
-    }
+    // Pruebas individuales de pista y campo
+    const enrolledAthletes = athletes.filter(a => (a.eventIds || []).includes(ev.id));
+    const fieldEvent = isFieldEvent(ev.id);
+    const entries = fieldEvent ? (eventResults.fieldEntries || []) : (eventResults.trackEntries || []);
+
+    const getEntryGender = (entry) => entry?.gender || athleteGenderMap.get(entry?.athleteId) || 'M';
+    const maleAthletes = enrolledAthletes.filter(a => a.gender === 'M');
+    const femaleAthletes = enrolledAthletes.filter(a => a.gender === 'F');
+    const maleEntries = entries.filter(e => getEntryGender(e) === 'M');
+    const femaleEntries = entries.filter(e => getEntryGender(e) === 'F');
+
+    const awardedM =
+      Boolean(eventResults.isAwarded) ||
+      Boolean(eventResults.awardedByGender?.M);
+    const awardedF =
+      Boolean(eventResults.isAwarded) ||
+      Boolean(eventResults.awardedByGender?.F);
+
+    const progressM = computeSubsetProgress(maleAthletes, maleEntries, fieldEvent, awardedM);
+    const progressF = computeSubsetProgress(femaleAthletes, femaleEntries, fieldEvent, awardedF);
+
+    const overallAwarded = Boolean(eventResults.isAwarded) || (
+      (progressM.totalParticipants > 0 || progressF.totalParticipants > 0) &&
+      (progressM.totalParticipants === 0 || progressM.isAwarded) &&
+      (progressF.totalParticipants === 0 || progressF.isAwarded)
+    );
+    const overallProgress = computeSubsetProgress(enrolledAthletes, entries, fieldEvent, overallAwarded);
 
     return {
       event: ev,
-      totalParticipants,
-      completedCount,
-      progressPercent: totalParticipants > 0 ? Math.round((completedCount / totalParticipants) * 100) : 0,
-      status,
-      isReadyForAwards: status === 'completed',
-      isAwarded: status === 'awarded'
+      isRelay: false,
+      participantUnit: 'atletas',
+      ...overallProgress,
+      byGender: {
+        M: progressM,
+        F: progressF
+      }
     };
   });
 }

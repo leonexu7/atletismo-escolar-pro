@@ -60,7 +60,7 @@ export default function AwardPresentationSheetModal({
                 Cédula Oficial de Premiación de Podio
               </h3>
               <p className="text-[11px] text-slate-500">
-                Diseño minimalista institucional con micro-detalles vectoriales
+                Formato oficial listo para imprimir o descargar en PDF
               </p>
             </div>
           </div>
@@ -173,20 +173,20 @@ export default function AwardPresentationSheetModal({
                   <Medal className="w-4 h-4 text-amber-500" />
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-5 pt-2 items-end">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-5 pt-4 items-end">
                   {/* 2º LUGAR (MEDALLA DE PLATA) */}
-                  <div className="rounded-2xl border-2 border-slate-300 bg-gradient-to-b from-slate-100/70 to-white p-5 text-center shadow-xs flex flex-col justify-between order-2 md:order-1 relative min-h-[265px]">
+                  <div className="rounded-2xl border-2 border-slate-300 bg-gradient-to-b from-slate-100/70 to-white p-5 pt-7 text-center shadow-xs flex flex-col justify-between order-2 md:order-1 relative min-h-[265px]">
                     {/* Micro-detalle: Marcadores de esquina finos en la tarjeta */}
-                    <div className="absolute top-2 left-2 text-[9px] font-bold text-slate-400 font-serif">II</div>
-                    <div className="absolute top-2 right-2 text-[9px] font-bold text-slate-400 font-serif">II</div>
+                    <div className="absolute top-2.5 left-2.5 text-[9px] font-bold text-slate-400 font-serif">II</div>
+                    <div className="absolute top-2.5 right-2.5 text-[9px] font-bold text-slate-400 font-serif">II</div>
 
-                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-slate-200 text-slate-800 text-[10px] font-black uppercase tracking-wider px-3.5 py-0.5 rounded-full shadow-2xs border border-slate-300">
-                      SUB-CAMPEÓN
+                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-slate-200 text-slate-800 text-[10px] font-black uppercase tracking-wider px-3.5 py-0.5 rounded-full shadow-2xs border border-slate-300 whitespace-nowrap">
+                      {gender === 'F' && !event?.id?.includes('mixto') ? 'SUB-CAMPEONA' : 'SUB-CAMPEÓN'}
                     </div>
                     <div>
                       {/* Medallón plata circular vectorial */}
                       <div className="w-12 h-12 mx-auto rounded-full bg-gradient-to-br from-slate-200 to-slate-300 border-2 border-slate-300 text-slate-800 font-athletic font-black text-xl flex items-center justify-center shadow-2xs mt-2 mb-3">
-                        🥈 2º
+                        2º
                       </div>
                       <h4 className="font-bold text-base sm:text-lg text-slate-900 leading-tight">
                         {silverWinner?.fullName || 'Por definir'}
@@ -224,18 +224,18 @@ export default function AwardPresentationSheetModal({
                   </div>
 
                   {/* 1º LUGAR (MEDALLA DE ORO / CAMPEÓN) - DESTACADO */}
-                  <div className="rounded-2xl border-2 border-amber-400 bg-gradient-to-b from-amber-50 via-amber-100/30 to-white p-5 text-center shadow-md flex flex-col justify-between order-1 md:order-2 md:-translate-y-2 relative min-h-[285px]">
+                  <div className="rounded-2xl border-2 border-amber-400 bg-gradient-to-b from-amber-50 via-amber-100/30 to-white p-5 pt-7 text-center shadow-md flex flex-col justify-between order-1 md:order-2 md:-translate-y-2 relative min-h-[285px]">
                     {/* Micro-detalle: Marcadores de esquina dorados */}
-                    <div className="absolute top-2 left-2 text-[10px] font-bold text-amber-500 font-serif">★ I ★</div>
-                    <div className="absolute top-2 right-2 text-[10px] font-bold text-amber-500 font-serif">★ I ★</div>
+                    <div className="absolute top-2.5 left-2.5 text-[10px] font-bold text-amber-500 font-serif">I</div>
+                    <div className="absolute top-2.5 right-2.5 text-[10px] font-bold text-amber-500 font-serif">I</div>
 
-                    <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 bg-amber-500 text-slate-950 text-[11px] font-black uppercase tracking-wider px-4 py-0.5 rounded-full shadow-xs border border-amber-400">
-                      ★ CAMPEÓN ★
+                    <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 bg-amber-500 text-slate-950 text-[11px] font-black uppercase tracking-wider px-4 py-0.5 rounded-full shadow-xs border border-amber-400 whitespace-nowrap">
+                      {event?.id?.includes('relevo') ? '1º • CAMPEÓN' : gender === 'F' ? 'CAMPEONA' : 'CAMPEÓN'}
                     </div>
                     <div>
                       {/* Medallón oro circular vectorial */}
                       <div className="w-14 h-14 mx-auto rounded-full bg-gradient-to-br from-amber-300 to-amber-500 border-2 border-amber-400 text-amber-950 font-athletic font-black text-2xl flex items-center justify-center shadow-xs mt-2 mb-3">
-                        🥇 1º
+                        1º
                       </div>
                       <h4 className="font-black text-lg sm:text-xl text-slate-900 leading-tight">
                         {goldWinner?.fullName || 'Por definir'}
@@ -273,18 +273,18 @@ export default function AwardPresentationSheetModal({
                   </div>
 
                   {/* 3º LUGAR (MEDALLA DE BRONCE) */}
-                  <div className="rounded-2xl border-2 border-amber-600/40 bg-gradient-to-b from-amber-50/60 to-white p-5 text-center shadow-xs flex flex-col justify-between order-3 relative min-h-[265px]">
+                  <div className="rounded-2xl border-2 border-amber-600/40 bg-gradient-to-b from-amber-50/60 to-white p-5 pt-7 text-center shadow-xs flex flex-col justify-between order-3 relative min-h-[265px]">
                     {/* Micro-detalle: Marcadores de esquina finos en la tarjeta */}
-                    <div className="absolute top-2 left-2 text-[9px] font-bold text-amber-700/60 font-serif">III</div>
-                    <div className="absolute top-2 right-2 text-[9px] font-bold text-amber-700/60 font-serif">III</div>
+                    <div className="absolute top-2.5 left-2.5 text-[9px] font-bold text-amber-700/60 font-serif">III</div>
+                    <div className="absolute top-2.5 right-2.5 text-[9px] font-bold text-amber-700/60 font-serif">III</div>
 
-                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-amber-700 text-amber-50 text-[10px] font-black uppercase tracking-wider px-3.5 py-0.5 rounded-full shadow-2xs border border-amber-600">
+                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-amber-700 text-amber-50 text-[10px] font-black uppercase tracking-wider px-3.5 py-0.5 rounded-full shadow-2xs border border-amber-600 whitespace-nowrap">
                       TERCER LUGAR
                     </div>
                     <div>
                       {/* Medallón bronce circular vectorial */}
                       <div className="w-12 h-12 mx-auto rounded-full bg-gradient-to-br from-amber-600 to-amber-700 border-2 border-amber-600 text-amber-100 font-athletic font-black text-xl flex items-center justify-center shadow-2xs mt-2 mb-3">
-                        🥉 3º
+                        3º
                       </div>
                       <h4 className="font-bold text-base sm:text-lg text-slate-900 leading-tight">
                         {bronzeWinner?.fullName || 'Por definir'}

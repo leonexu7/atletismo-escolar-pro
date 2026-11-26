@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Cloud,
   Wifi,
@@ -34,6 +34,11 @@ export default function CloudSyncModal({
   const [offlinePasswordInput, setOfflinePasswordInput] = useState('');
   const [offlineError, setOfflineError] = useState('');
 
+  useEffect(() => {
+    if (cloudSession?.roomCode) {
+      setRoomCode(cloudSession.roomCode);
+    }
+  }, [cloudSession?.roomCode, isOpen]);
 
   if (!isOpen) return null;
 

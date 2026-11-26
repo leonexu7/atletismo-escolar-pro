@@ -156,13 +156,13 @@ export default function Navbar({
 
       {/* Barra de Navegación Principal en Blanco y Pastel */}
       <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-14">
+        <div className="flex items-center justify-between gap-2 h-14">
           {/* Logotipo Oficial con Silueta de Corredor Formal (Esquinas redondeadas sin huecos) */}
           <div
-            className="flex items-center space-x-2.5 cursor-pointer flex-shrink-0"
+            className="flex items-center space-x-2 cursor-pointer flex-shrink-0"
             onClick={() => onSelectTab('registration')}
           >
-            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl overflow-hidden border border-slate-200/90 bg-white flex items-center justify-center shadow-2xs hover:border-slate-300 transition-all flex-shrink-0">
+            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl overflow-hidden border border-slate-200/90 bg-white flex items-center justify-center shadow-2xs hover:border-slate-300 transition-all flex-shrink-0">
               <img
                 src={runnerSilhouette}
                 alt="Silueta de Corredor Oficial"
@@ -170,17 +170,17 @@ export default function Navbar({
               />
             </div>
             <div>
-              <span className="font-extrabold text-sm sm:text-base tracking-tight text-slate-900 block leading-tight">
+              <span className="font-extrabold text-xs sm:text-sm xl:text-base tracking-tight text-slate-900 block leading-tight whitespace-nowrap">
                 ATLETISMO ESCOLAR
               </span>
-              <span className="text-[10px] text-slate-500 block leading-none font-medium">
+              <span className="text-[10px] text-slate-500 hidden lg:block leading-none font-medium whitespace-nowrap">
                 Gestión Oficial de Juegos Deportivos
               </span>
             </div>
           </div>
 
-          {/* Pestañas de Navegación con Scroll Horizontal Suave en Móviles */}
-          <nav className="flex space-x-1 overflow-x-auto no-scrollbar py-1">
+          {/* Pestañas de Navegación Adaptables sin recorte en laptops ni tablets */}
+          <nav className="flex items-center space-x-1 overflow-x-auto no-scrollbar py-1 min-w-0">
             {visibleTabs.map((tab) => {
               const Icon = tab.icon;
               const isActive = activeTab === tab.id;
@@ -190,20 +190,21 @@ export default function Navbar({
                 <button
                   key={tab.id}
                   onClick={() => handleTabClick(tab)}
-                  className={`relative flex items-center space-x-1.5 px-3 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
+                  title={tab.label}
+                  className={`relative flex items-center space-x-1 xl:space-x-1.5 px-2 lg:px-2.5 xl:px-3 py-1.5 rounded-xl text-[11px] xl:text-xs font-semibold whitespace-nowrap shrink-0 transition-all ${
                     isActive
                       ? 'bg-rose-50 text-rose-700 border border-rose-200 shadow-xs'
                       : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
                   }`}
                 >
-                  <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-rose-600' : 'text-slate-500'}`} />
-                  <span className="hidden md:inline">{tab.label}</span>
-                  <span className="md:hidden">{tab.shortLabel}</span>
+                  <Icon className={`w-3.5 h-3.5 shrink-0 ${isActive ? 'text-rose-600' : 'text-slate-500'}`} />
+                  <span className="hidden xl:inline">{tab.label}</span>
+                  <span className="xl:hidden">{tab.shortLabel}</span>
 
-                  {isLocked && <Lock className="w-3 h-3 text-slate-400 ml-0.5" />}
+                  {isLocked && <Lock className="w-3 h-3 text-slate-400 ml-0.5 shrink-0" />}
 
                   {tab.badge && (
-                    <span className="ml-1 text-[10px] px-1.5 py-0.2 bg-emerald-500 text-white font-bold rounded-full animate-pulse">
+                    <span className="ml-0.5 text-[10px] px-1.5 py-0.2 bg-emerald-500 text-white font-bold rounded-full animate-pulse">
                       {tab.badge}
                     </span>
                   )}

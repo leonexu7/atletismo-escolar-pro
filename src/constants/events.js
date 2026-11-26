@@ -207,3 +207,8 @@ export function isTrackEvent(eventId) {
   const ev = getEventById(eventId);
   return ev?.type === EVENT_TYPES.TRACK || ev?.type === EVENT_TYPES.RELAY;
 }
+
+export function isRelayEvent(eventId) {
+  const ev = getEventById(eventId);
+  return ev?.type === EVENT_TYPES.RELAY;
+}

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   Users,
   Search,
@@ -25,6 +25,8 @@ import { exportMasterAthletesRosterToExcel } from '../utils/excelHandler';
 import { generateMasterAthletesRosterPDF } from '../utils/pdfGenerator';
 import { calculateAge, isRegistrationDeadlineExpired, formatDeadlineFriendly } from '../utils/timeFormatter';
 
+const PAGE_SIZE = 30;
+
 export default function AthletesRosterView({
   tournament,
   athletes = [],
@@ -43,9 +45,16 @@ export default function AthletesRosterView({
   const [selectedGrade, setSelectedGrade] = useState('ALL');
   const [sortField, setSortField] = useState('bibNumber'); // bibNumber | name | school
   const [sortAsc, setSortAsc] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [showAllRows, setShowAllRows] = useState(false);
 
   // Modal de edición de atleta en padrón
   const [editingAthlete, setEditingAthlete] = useState(null);
+  const [editError, setEditError] = useState('');
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, selectedGender, selectedSchoolId, selectedEventId, selectedGrade, sortField, sortAsc]);
 
   // Estadísticas globales del padrón
   const stats = useMemo(() => {
@@ -147,25 +156,79 @@ export default function AthletesRosterView({
     selectedEventId !== 'ALL' ||
     selectedGrade !== 'ALL';
 
+  const totalPages = Math.max(1, Math.ceil(filteredAthletes.length / PAGE_SIZE));
+  const safePage = Math.min(currentPage, totalPages);
+  const paginatedAthletes = useMemo(() => {
+    if (showAllRows) return filteredAthletes;
+    const start = (safePage - 1) * PAGE_SIZE;
+    return filteredAthletes.slice(start, start + PAGE_SIZE);
+  }, [filteredAthletes, showAllRows, safePage]);
+
   const handleSaveAthleteEdit = (e) => {
     e.preventDefault();
     if (!editingAthlete) return;
     if (isLockedForTeacher) {
-      alert(`El periodo de registro oficial cerró el ${formatDeadlineFriendly(tournament?.registrationDeadline)}. Se requiere acceso de Mesa de Control para modificar atletas.`);
+      setEditError(`El periodo de registro oficial cerró el ${formatDeadlineFriendly(tournament?.registrationDeadline)}. Se requiere acceso de Mesa de Control para modificar atletas.`);
       return;
     }
-    onUpdateAthlete(editingAthlete);
+
+    if (!editingAthlete.fullName?.trim()) {
+      setEditError('El nombre del alumno es obligatorio.');
+      return;
+    }
+
+    if (editingAthlete.bibNumber !== null && editingAthlete.bibNumber !== undefined && String(editingAthlete.bibNumber).trim() !== '') {
+      const targetBib = String(editingAthlete.bibNumber).trim();
+      const collision = athletes.find(
+        a => a.id !== editingAthlete.id && String(a.bibNumber ?? '').trim() === targetBib
+      );
+      if (collision) {
+        setEditError(`El dorsal #${targetBib} ya pertenece a ${collision.fullName}. Usa otro número.`);
+        return;
+      }
+    }
+
+    const validGenderEvents = (editingAthlete.eventIds || []).filter(eId => {
+      if (editingAthlete.gender === 'M' && eId === 'relevo_4x75m_femenil') return false;
+      if (editingAthlete.gender === 'F' && eId === 'relevo_4x75m_varonil') return false;
+      return true;
+    });
+
+    const isUnified = (tournament?.categoryGroupingMode || 'unified') === 'unified';
+    const calculatedCategory = isUnified
+      ? 'primaria_abierta'
+      : (editingAthlete.schoolGrade === '3' || editingAthlete.schoolGrade === '4' ? 'infantil_menor' : 'infantil_mayor');
+
+    const schoolObj = schools.find(s => s.id === editingAthlete.schoolId);
+
+    onUpdateAthlete({
+      ...editingAthlete,
+      fullName: editingAthlete.fullName.trim(),
+      schoolName: schoolObj?.name || editingAthlete.schoolName,
+      categoryId: calculatedCategory,
+      eventIds: validGenderEvents
+    });
+    setEditError('');
     setEditingAthlete(null);
   };
 
   const toggleEditEvent = (eventId) => {
     if (!editingAthlete) return;
+    const ev = OFFICIAL_EVENTS.find(e => e.id === eventId);
+    if (editingAthlete.gender === 'M' && eventId === 'relevo_4x75m_femenil') {
+      setEditError('Un competidor varonil no puede inscribirse en Relevo 4x75m Femenil.');
+      return;
+    }
+    if (editingAthlete.gender === 'F' && eventId === 'relevo_4x75m_varonil') {
+      setEditError('Una competidora femenil no puede inscribirse en Relevo 4x75m Varonil.');
+      return;
+    }
+
     const current = editingAthlete.eventIds || [];
     let updated;
     if (current.includes(eventId)) {
       updated = current.filter(id => id !== eventId);
     } else {
-      const ev = OFFICIAL_EVENTS.find(e => e.id === eventId);
       const isRelay = ev?.type === 'relevo' || eventId.includes('relevo');
       const indivCount = current.filter(id => {
         const item = OFFICIAL_EVENTS.find(e => e.id === id);
@@ -177,15 +240,16 @@ export default function AthletesRosterView({
       }).length;
 
       if (!isRelay && indivCount >= 2) {
-        alert('Reglamento del Torneo: Máximo 2 pruebas individuales por competidor.');
+        setEditError('Reglamento del Torneo: Máximo 2 pruebas individuales por competidor.');
         return;
       }
       if (isRelay && relayCount >= 2) {
-        alert('Reglamento del Torneo: Máximo 2 pruebas de equipo / relevos por competidor.');
+        setEditError('Reglamento del Torneo: Máximo 2 pruebas de equipo / relevos por competidor.');
         return;
       }
       updated = [...current, eventId];
     }
+    setEditError('');
     setEditingAthlete({ ...editingAthlete, eventIds: updated });
   };
 
@@ -314,7 +378,7 @@ export default function AthletesRosterView({
             type="text"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Buscar por nombre del alumno, número de dorsal, CURP o escuela..."
+            placeholder="Buscar por nombre del alumno, número de dorsal o escuela..."
             className="w-full pl-10 pr-9 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:bg-white transition-all"
           />
           {searchTerm && (
@@ -473,9 +537,10 @@ export default function AthletesRosterView({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {filteredAthletes.map((athlete, idx) => {
+                {paginatedAthletes.map((athlete, idx) => {
                   const school = schools.find(s => s.id === athlete.schoolId);
                   const isBoy = athlete.gender === 'M';
+                  const rowNum = showAllRows ? idx + 1 : (safePage - 1) * PAGE_SIZE + idx + 1;
 
                   return (
                     <tr
@@ -484,7 +549,7 @@ export default function AthletesRosterView({
                     >
                       {/* Consecutivo */}
                       <td className="py-3 px-3.5 text-center text-slate-400 font-mono text-[11px]">
-                        {idx + 1}
+                        {rowNum}
                       </td>
 
                       {/* Dorsal */}
@@ -520,10 +585,10 @@ export default function AthletesRosterView({
                       </td>
 
                       {/* Grado y Edad */}
-                      <td className="py-3 px-3.5 text-center text-slate-600 font-medium">
+                      <td className="py-3 px-3.5 text-center text-slate-600 font-medium whitespace-nowrap">
                         <div>{athlete.schoolGrade ? `${athlete.schoolGrade}° Primaria` : '-'}</div>
                         {athlete.birthDate && (
-                          <div className="text-[10px] text-slate-500 font-medium">
+                          <div className="text-[10px] text-slate-500 font-medium whitespace-nowrap">
                             {athlete.birthDate}
                             {calculateAge(athlete.birthDate) !== null && (
                               <span className="font-bold text-slate-800 ml-1">
@@ -589,7 +654,10 @@ export default function AthletesRosterView({
                           <div className="flex items-center justify-end space-x-1.5">
                             <button
                               type="button"
-                              onClick={() => setEditingAthlete({ ...athlete })}
+                              onClick={() => {
+                                setEditError('');
+                                setEditingAthlete({ ...athlete });
+                              }}
                               className="p-1.5 rounded-lg text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
                               title="Editar datos del atleta"
                             >
@@ -615,6 +683,49 @@ export default function AthletesRosterView({
                 })}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {/* Controles de Paginación para fluidez con +200 atletas */}
+        {filteredAthletes.length > PAGE_SIZE && (
+          <div className="px-4 py-3 bg-slate-50 border-t border-slate-200 flex flex-wrap items-center justify-between gap-2 text-xs">
+            <span className="text-slate-500 font-medium">
+              {showAllRows
+                ? `Mostrando los ${filteredAthletes.length} competidores`
+                : `Mostrando ${(safePage - 1) * PAGE_SIZE + 1}–${Math.min(safePage * PAGE_SIZE, filteredAthletes.length)} de ${filteredAthletes.length} competidores`}
+            </span>
+            <div className="flex items-center space-x-1.5">
+              {!showAllRows && (
+                <>
+                  <button
+                    type="button"
+                    disabled={safePage <= 1}
+                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                    className="px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-slate-700 font-semibold hover:bg-slate-100 disabled:opacity-40"
+                  >
+                    Anterior
+                  </button>
+                  <span className="px-2 font-mono font-bold text-slate-700">
+                    {safePage} / {totalPages}
+                  </span>
+                  <button
+                    type="button"
+                    disabled={safePage >= totalPages}
+                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                    className="px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-slate-700 font-semibold hover:bg-slate-100 disabled:opacity-40"
+                  >
+                    Siguiente
+                  </button>
+                </>
+              )}
+              <button
+                type="button"
+                onClick={() => setShowAllRows(prev => !prev)}
+                className="px-2.5 py-1 rounded-lg bg-indigo-50 border border-indigo-200 text-indigo-700 font-bold hover:bg-indigo-100 transition-colors"
+              >
+                {showAllRows ? 'Paginar (30/pág)' : `Ver todos (${filteredAthletes.length})`}
+              </button>
+            </div>
           </div>
         )}
       </div>
@@ -690,6 +801,12 @@ export default function AthletesRosterView({
                     onChange={(e) => setEditingAthlete({ ...editingAthlete, schoolGrade: e.target.value })}
                     className="w-full px-3 py-2 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400"
                   >
+                    {(tournament?.categoryGroupingMode || 'unified') === 'unified' && (
+                      <>
+                        <option value="1">1° Primaria</option>
+                        <option value="2">2° Primaria</option>
+                      </>
+                    )}
                     <option value="3">3° Primaria</option>
                     <option value="4">4° Primaria</option>
                     <option value="5">5° Primaria</option>
@@ -737,13 +854,20 @@ export default function AthletesRosterView({
                 <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto p-2 bg-slate-50 rounded-xl border border-slate-200">
                   {OFFICIAL_EVENTS.map(ev => {
                     const isSelected = (editingAthlete.eventIds || []).includes(ev.id);
+                    const isIncompatibleRelay =
+                      (editingAthlete.gender === 'M' && ev.id === 'relevo_4x75m_femenil') ||
+                      (editingAthlete.gender === 'F' && ev.id === 'relevo_4x75m_varonil');
+
                     return (
                       <button
                         type="button"
                         key={ev.id}
+                        disabled={isIncompatibleRelay}
                         onClick={() => toggleEditEvent(ev.id)}
                         className={`p-2.5 rounded-lg text-center border transition-all text-xs font-semibold ${
-                          isSelected
+                          isIncompatibleRelay
+                            ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed opacity-60'
+                            : isSelected
                             ? 'bg-indigo-600 border-indigo-700 text-white font-bold shadow-xs'
                             : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
                         }`}
@@ -754,6 +878,13 @@ export default function AthletesRosterView({
                   })}
                 </div>
               </div>
+
+              {editError && (
+                <div className="p-2.5 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl text-xs font-semibold flex items-center space-x-1.5">
+                  <AlertCircle className="w-4 h-4 text-rose-500 shrink-0" />
+                  <span>{editError}</span>
+                </div>
+              )}
 
               <div className="flex items-center justify-end space-x-2 pt-3 border-t border-slate-100">
                 <button

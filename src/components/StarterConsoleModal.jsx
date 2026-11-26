@@ -37,11 +37,16 @@ export default function StarterConsoleModal({
   const startTimestampRef = useRef(null);
   const rafRef = useRef(null);
 
-  const activeHeat = heats[selectedHeatIndex] || heats[0] || { lanes: [] };
+  const safeHeatIndex = heats.length > 0 ? Math.min(selectedHeatIndex, heats.length - 1) : 0;
+  const activeHeat = heats[safeHeatIndex] || heats[0] || { lanes: [] };
   const displayedLanes = (activeHeat.lanes || []).slice(0, currentLanesCount);
 
   // Opciones de 2 a 8 carriles según requerimiento
   const LANE_OPTIONS = [2, 3, 4, 5, 6, 7, 8];
+
+  useEffect(() => {
+    setCurrentLanesCount(lanesCount || 6);
+  }, [lanesCount]);
 
   // Sincronizar estado si viene de la nube o cambio externo
   useEffect(() => {
@@ -213,7 +218,7 @@ export default function StarterConsoleModal({
               <div>
                 <label className="text-[11px] text-slate-500 font-semibold block mb-1">Serie / Heat:</label>
                 <select
-                  value={selectedHeatIndex}
+                  value={safeHeatIndex}
                   onChange={(e) => {
                     handleReset();
                     if (onSelectHeatIndex) onSelectHeatIndex(Number(e.target.value));

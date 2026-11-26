@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import confetti from 'canvas-confetti';
 import {
   Trophy,
@@ -14,7 +14,7 @@ import {
   Eye,
   FileText
 } from 'lucide-react';
-import { OFFICIAL_EVENTS, isFieldEvent } from '../constants/events';
+import { OFFICIAL_EVENTS, isFieldEvent, isRelayEvent } from '../constants/events';
 import { formatTrackTime, formatFieldDistance } from '../utils/timeFormatter';
 import { evaluateFieldAttempts, rankFieldEventCompetitors, rankTrackEventRunners } from '../utils/tieBreaker';
 import { generateAwardsDiplomasPDF, generateAwardPresentationSheetPDF } from '../utils/pdfGenerator';
@@ -23,18 +23,52 @@ import AwardPresentationSheetModal from './AwardPresentationSheetModal';
 export default function LiveResultsView({
   tournament,
   athletes = [],
+  relays = [],
   schools = [],
   results = {},
-  initialEventId = 'campo_longitud'
+  initialEventId = 'campo_longitud',
+  initialGender = null
 }) {
   const [selectedEventId, setSelectedEventId] = useState(initialEventId);
-  const [selectedGender, setSelectedGender] = useState('M');
+  const [selectedGender, setSelectedGender] = useState(
+    initialGender === 'F' || initialGender === 'M' ? initialGender : 'M'
+  );
   const [isAwardSheetOpen, setIsAwardSheetOpen] = useState(false);
+
+  useEffect(() => {
+    if (initialEventId) setSelectedEventId(initialEventId);
+  }, [initialEventId]);
+
+  useEffect(() => {
+    if (initialGender === 'M' || initialGender === 'F') {
+      setSelectedGender(initialGender);
+    }
+  }, [initialGender]);
 
   const activeEvent = OFFICIAL_EVENTS.find(e => e.id === selectedEventId) || OFFICIAL_EVENTS[0];
   const isField = isFieldEvent(activeEvent.id);
+  const isRelay = isRelayEvent(activeEvent.id);
 
   const eventAthletes = useMemo(() => {
+    if (isRelay) {
+      return (relays || [])
+        .filter(r => r.eventId === activeEvent.id)
+        .map(relay => {
+          const school = schools.find(s => s.id === relay.schoolId);
+          const memberObjs = (relay.members || []).map(id => athletes.find(a => a.id === id)).filter(Boolean);
+          const bibSummary = memberObjs.map(m => m.bibNumber).filter(Boolean).join('/');
+          return {
+            id: relay.id,
+            fullName: `Equipo ${relay.schoolName || school?.name || 'Escuela'}`,
+            bibNumber: bibSummary || 'EQ',
+            schoolId: relay.schoolId,
+            schoolName: memberObjs.map(m => `${m.fullName.split(' ')[0]} (#${m.bibNumber || '-'})`).join(', ') || (school?.name || 'Escuela Primaria'),
+            schoolShort: school?.shortName || relay.baseSchoolName || 'Escuela',
+            isRelayTeam: true
+          };
+        });
+    }
+
     return athletes.filter(a => {
       const matchEvent = (a.eventIds || []).includes(activeEvent.id);
       const matchGender = activeEvent.id.includes('mixto') ? true : a.gender === selectedGender;
@@ -47,7 +81,7 @@ export default function LiveResultsView({
         schoolShort: school?.shortName || 'Escuela'
       };
     });
-  }, [athletes, schools, activeEvent.id, selectedGender]);
+  }, [athletes, relays, schools, activeEvent.id, selectedGender, isRelay]);
 
   const eventResults = results[activeEvent.id] || {};
 
@@ -58,10 +92,19 @@ export default function LiveResultsView({
         const found = fieldData.find(e => e.athleteId === ath.id);
         const attempts = found?.attempts || [];
         const tech = evaluateFieldAttempts(attempts);
+        const markFormatted = tech.hasValidMark
+          ? formatFieldDistance(tech.bestMark)
+          : tech.isPending
+          ? 'Pendiente'
+          : tech.hasOnlyFouls
+          ? 'SM'
+          : tech.hasOnlyPasses
+          ? 'PASA'
+          : 'DNS';
         return {
           ...ath,
           ...tech,
-          markFormatted: tech.hasValidMark ? formatFieldDistance(tech.bestMark) : tech.hasOnlyFouls ? 'NULO' : 'DNS'
+          markFormatted
         };
       });
       return rankFieldEventCompetitors(evaluated);
@@ -70,12 +113,18 @@ export default function LiveResultsView({
       const evaluated = eventAthletes.map(ath => {
         const found = trackData.find(e => e.athleteId === ath.id);
         const timeSeconds = found?.timeSeconds || null;
+        const st = (found?.status || (timeSeconds ? 'valid' : 'pending')).toLowerCase();
+        const markFormatted = timeSeconds && st === 'valid'
+          ? formatTrackTime(timeSeconds)
+          : st !== 'valid' && st !== 'pending'
+          ? st.toUpperCase()
+          : 'Pendiente';
         return {
           ...ath,
           timeSeconds,
-          status: found?.status || (timeSeconds ? 'valid' : 'pending'),
+          status: st,
           statusReason: found?.statusReason || '',
-          markFormatted: timeSeconds ? formatTrackTime(timeSeconds) : found?.status?.toUpperCase() || 'DNS'
+          markFormatted
         };
       });
       return rankTrackEventRunners(evaluated);
@@ -94,13 +143,21 @@ export default function LiveResultsView({
     });
   };
 
+  const effectiveGender = activeEvent.id.includes('mixto')
+    ? 'MIXED'
+    : activeEvent.id.includes('femenil')
+    ? 'F'
+    : activeEvent.id.includes('varonil')
+    ? 'M'
+    : selectedGender;
+
   const handleDownloadAwardSheetPDF = () => {
     const hasAnyResult = rankedList.some(w => isField ? w.hasValidMark : (w.status === 'valid' && w.timeSeconds));
     if (!hasAnyResult) {
       alert('Aún no hay atletas premiados con marcas oficiales registradas en esta prueba.');
       return;
     }
-    const genderLabel = activeEvent.id.includes('mixto') ? 'Mixto' : selectedGender === 'F' ? 'Femenil' : 'Varonil';
+    const genderLabel = effectiveGender === 'MIXED' ? 'Mixto' : effectiveGender === 'F' ? 'Femenil' : 'Varonil';
     generateAwardPresentationSheetPDF(rankedList, activeEvent, tournament, genderLabel);
   };
 
@@ -155,8 +212,8 @@ export default function LiveResultsView({
           </div>
         </div>
 
-        {/* Carrusel de Pruebas */}
-        <div className="flex space-x-1.5 overflow-x-auto no-scrollbar pb-1">
+        {/* Carrusel de Pruebas con ajuste limpio en múltiples líneas sin recorte */}
+        <div className="flex flex-wrap gap-1.5 pb-1">
           {OFFICIAL_EVENTS.map(ev => {
             const isSelected = selectedEventId === ev.id;
             return (
@@ -183,7 +240,9 @@ export default function LiveResultsView({
             Podio de Premiación
           </span>
           <h3 className="text-xl sm:text-2xl font-black text-slate-900 uppercase">
-            {activeEvent.name} ({activeEvent.id.includes('mixto') ? 'Combinado Mixto' : selectedGender === 'M' ? 'Varonil' : 'Femenil'})
+            {isRelay
+              ? activeEvent.name
+              : `${activeEvent.name} (${selectedGender === 'M' ? 'Varonil' : 'Femenil'})`}
           </h3>
           <p className="text-xs text-slate-500">
             {isField ? 'Clasificación por MEJOR MARCA VÁLIDA (Reglamento World Athletics)' : 'Clasificación por menor tiempo de carrera'}
@@ -230,7 +289,7 @@ export default function LiveResultsView({
                   1º
                 </div>
                 <span className="text-[10px] font-black uppercase text-amber-800 tracking-wider">
-                  CAMPEÓN DE ORO
+                  {isRelay ? 'EQUIPO CAMPEÓN DE ORO' : selectedGender === 'F' ? 'CAMPEONA DE ORO' : 'CAMPEÓN DE ORO'}
                 </span>
                 <h4 className="font-black text-base text-slate-900 truncate max-w-full">{goldWinner.fullName}</h4>
                 <p className="text-xs text-slate-600 truncate max-w-full">{goldWinner.schoolName}</p>
@@ -357,7 +416,7 @@ export default function LiveResultsView({
                 return (
                   <tr key={competitor.id} className={isTop3 ? 'bg-amber-50/20' : 'hover:bg-slate-50/60'}>
                     <td className="py-2.5 px-3">
-                      <span className={`inline-flex items-center justify-center w-5 h-5 rounded-md font-bold text-[11px] ${
+                      <span className={`inline-flex items-center justify-center min-w-[26px] h-6 px-1.5 rounded-md font-bold text-[11px] whitespace-nowrap ${
                         idx === 0 && isTop3 ? 'bg-amber-400 text-amber-950 font-black' :
                         idx === 1 && isTop3 ? 'bg-slate-300 text-slate-900 font-bold' :
                         idx === 2 && isTop3 ? 'bg-amber-700 text-white font-bold' : 'bg-slate-100 text-slate-600'
@@ -393,7 +452,7 @@ export default function LiveResultsView({
         isOpen={isAwardSheetOpen}
         onClose={() => setIsAwardSheetOpen(false)}
         event={activeEvent}
-        gender={selectedGender}
+        gender={effectiveGender}
         tournament={tournament}
         rankedList={rankedList}
       />

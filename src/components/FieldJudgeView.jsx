@@ -125,7 +125,14 @@ export default function FieldJudgeView({
     if (saved && Array.isArray(saved.attempts)) {
       return saved.attempts.map(a => ({
         attemptNum: a.attemptNum,
-        valStr: a.value !== null && a.value !== undefined ? String(a.value) : '',
+        valStr:
+          a.status === 'foul'
+            ? 'X'
+            : a.status === 'pass'
+            ? '-'
+            : a.value !== null && a.value !== undefined
+            ? String(a.value)
+            : '',
         status: a.status || (a.value ? 'valid' : 'pending')
       }));
     }
@@ -173,38 +180,53 @@ export default function FieldJudgeView({
       return;
     }
 
-    const updatedEntries = eligibleAthletes.map(athlete => {
-      const attemptsState = getAthleteAttempts(athlete.id);
+    const updatedCurrentGenderEntries = eligibleAthletes
+      .map(athlete => {
+        const attemptsState = getAthleteAttempts(athlete.id);
+        const parsedAttempts = attemptsState.map(att => {
+          let value = null;
+          let status = att.status;
 
-      const parsedAttempts = attemptsState.map(att => {
-        let value = null;
-        let status = att.status;
+          if (att.status === 'valid') {
+            value = parseFieldDistance(att.valStr);
+            if (value === null) status = 'pending';
+          } else if (att.status === 'foul') {
+            value = null;
+            status = 'foul';
+          } else if (att.status === 'pass') {
+            value = null;
+            status = 'pass';
+          }
 
-        if (att.status === 'valid') {
-          value = parseFieldDistance(att.valStr);
-          if (value === null) status = 'pending';
-        } else if (att.status === 'foul') {
-          value = null;
-          status = 'foul';
-        } else if (att.status === 'pass') {
-          value = null;
-          status = 'pass';
-        }
+          return {
+            attemptNum: att.attemptNum,
+            value,
+            status
+          };
+        });
+
+        const hasAnyData =
+          parsedAttempts.some(a => a.status !== 'pending') ||
+          Boolean(localAttempts[athlete.id]) ||
+          currentFieldEntries.some(e => e.athleteId === athlete.id);
+
+        if (!hasAnyData) return null;
 
         return {
-          attemptNum: att.attemptNum,
-          value,
-          status
+          athleteId: athlete.id,
+          gender: athlete.gender || selectedGender,
+          attempts: parsedAttempts
         };
-      });
+      })
+      .filter(Boolean);
 
-      return {
-        athleteId: athlete.id,
-        attempts: parsedAttempts
-      };
+    // Conservar intactas las marcas de la otra rama (Varonil / Femenil)
+    const eligibleIds = new Set(eligibleAthletes.map(a => a.id));
+    const otherGenderEntries = currentFieldEntries.filter(e => !eligibleIds.has(e.athleteId));
+
+    onSaveFieldResult(activeEvent.id, [...otherGenderEntries, ...updatedCurrentGenderEntries], {
+      gender: selectedGender
     });
-
-    onSaveFieldResult(activeEvent.id, updatedEntries);
     alert('¡Marcas de los 3 intentos guardadas y sincronizadas con la Mesa de Control!');
   };
 
@@ -297,7 +319,10 @@ export default function FieldJudgeView({
           {/* Selector de Rama */}
           <div className="flex bg-slate-100 p-1 rounded-xl self-start sm:self-auto">
             <button
-              onClick={() => setSelectedGender('M')}
+              onClick={() => {
+                setSelectedGender('M');
+                setLocalAttempts({});
+              }}
               className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
                 selectedGender === 'M' ? 'bg-white text-sky-700 shadow-xs' : 'text-slate-600 hover:text-slate-900'
               }`}
@@ -305,7 +330,10 @@ export default function FieldJudgeView({
               Varonil
             </button>
             <button
-              onClick={() => setSelectedGender('F')}
+              onClick={() => {
+                setSelectedGender('F');
+                setLocalAttempts({});
+              }}
               className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
                 selectedGender === 'F' ? 'bg-white text-rose-700 shadow-xs' : 'text-slate-600 hover:text-slate-900'
               }`}
@@ -349,7 +377,28 @@ export default function FieldJudgeView({
         </div>
 
         <button
-          onClick={() => generateOfficialFieldSheetPDF(activeEvent, eligibleAthletes, tournament, currentFieldEntries, liveRankings)}
+          onClick={() => {
+            const mergedEntriesForPDF = eligibleAthletes.map(athlete => {
+              const attemptsState = getAthleteAttempts(athlete.id);
+              const parsedAttempts = attemptsState.map(att => {
+                let value = null;
+                if (att.status === 'valid') value = parseFieldDistance(att.valStr);
+                return {
+                  attemptNum: att.attemptNum,
+                  value,
+                  status: att.status === 'valid' && value === null ? 'pending' : att.status
+                };
+              });
+              const rankedMatch = liveRankings.find(r => r.id === athlete.id);
+              return {
+                athleteId: athlete.id,
+                attempts: parsedAttempts,
+                bestMark: rankedMatch?.bestMark ?? 0
+              };
+            });
+            const genderLabel = selectedGender === 'F' ? 'Femenil' : 'Varonil';
+            generateOfficialFieldSheetPDF(activeEvent, eligibleAthletes, tournament, mergedEntriesForPDF, liveRankings, genderLabel);
+          }}
           className="px-3 py-1.5 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-xl text-xs font-semibold flex items-center space-x-1.5 transition-colors self-end sm:self-auto"
           title="Descargar planilla PDF con marcas de los 3 intentos y lugares calculados"
         >
@@ -589,7 +638,7 @@ export default function FieldJudgeView({
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-2 truncate">
-                        <span className={`w-5 h-5 rounded-md font-bold flex items-center justify-center text-[11px] ${
+                        <span className={`min-w-[26px] h-6 px-1.5 rounded-md font-bold flex items-center justify-center text-[11px] whitespace-nowrap shrink-0 ${
                           idx === 0 && athlete.hasValidMark ? 'bg-amber-400 text-amber-950 font-black' :
                           idx === 1 && athlete.hasValidMark ? 'bg-slate-300 text-slate-900 font-bold' :
                           idx === 2 && athlete.hasValidMark ? 'bg-amber-700 text-white font-bold' : 'bg-slate-200 text-slate-600'
@@ -620,7 +669,7 @@ export default function FieldJudgeView({
 
           <div className="pt-3 border-t border-slate-100">
             <button
-              onClick={() => onOpenLiveResults(activeEvent.id)}
+              onClick={() => onOpenLiveResults(activeEvent.id, selectedGender)}
               className="w-full py-2 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-xl text-xs font-semibold flex items-center justify-center space-x-1 transition-colors"
             >
               <Sparkles className="w-3.5 h-3.5 text-emerald-600" />

@@ -20,7 +20,7 @@ import {
   Layers,
   Zap
 } from 'lucide-react';
-import { OFFICIAL_EVENTS, isTrackEvent } from '../constants/events';
+import { OFFICIAL_EVENTS, isTrackEvent, isRelayEvent } from '../constants/events';
 import { formatTrackTime, parseTrackTime } from '../utils/timeFormatter';
 import { generateTrackHeats } from '../utils/athleticsEngine';
 import { rankTrackEventRunners } from '../utils/tieBreaker';
@@ -32,6 +32,7 @@ import MultiLaneStopwatchModal from './MultiLaneStopwatchModal';
 export default function TrackJudgeView({
   tournament,
   athletes = [],
+  relays = [],
   schools = [],
   results = {},
   onSaveTrackResult,
@@ -103,6 +104,7 @@ export default function TrackJudgeView({
   };
 
   const activeEvent = trackEvents.find(e => e.id === selectedEventId) || trackEvents[0];
+  const isRelay = isRelayEvent(activeEvent.id);
 
   const currentGender = activeEvent.id === 'relevo_4x75m_mixto'
     ? 'MIXED'
@@ -112,7 +114,37 @@ export default function TrackJudgeView({
     ? 'M'
     : selectedGender;
 
+  useEffect(() => {
+    setSelectedHeatIndex(0);
+    setLocalTimes({});
+  }, [selectedEventId, currentGender]);
+
   const eligibleAthletes = useMemo(() => {
+    if (isRelay) {
+      return (relays || [])
+        .filter(r => r.eventId === activeEvent.id)
+        .map(relay => {
+          const school = schools.find(s => s.id === relay.schoolId);
+          const memberList = (relay.members || [])
+            .map(mId => athletes.find(a => a.id === mId))
+            .filter(Boolean);
+          const memberSummary = memberList
+            .map(m => `#${m.bibNumber || 'S/N'} ${m.fullName.split(' ')[0]}`)
+            .join(', ');
+          const schoolTitle = relay.schoolName || school?.name || 'Escuela Primaria';
+          return {
+            id: relay.id,
+            fullName: `Equipo ${schoolTitle}`,
+            bibNumber: memberList.map(m => m.bibNumber).filter(Boolean).join('/') || 'EQ',
+            schoolId: relay.schoolId,
+            schoolName: memberSummary ? `Postas: ${memberSummary}` : schoolTitle,
+            schoolShort: school?.shortName || relay.baseSchoolName || schoolTitle,
+            gender: currentGender,
+            isRelayTeam: true
+          };
+        });
+    }
+
     return athletes.filter(a => {
       const matchEvent = (a.eventIds || []).includes(activeEvent.id);
       const matchGender = activeEvent.id.includes('mixto') ? true : a.gender === currentGender;
@@ -125,13 +157,14 @@ export default function TrackJudgeView({
         schoolShort: school?.shortName || 'Escuela'
       };
     });
-  }, [athletes, schools, activeEvent.id, currentGender]);
+  }, [athletes, relays, schools, activeEvent.id, currentGender, isRelay]);
 
   const heats = useMemo(() => {
-    return generateTrackHeats(eligibleAthletes, tournament?.lanesCount || 6);
-  }, [eligibleAthletes, tournament?.lanesCount]);
+    return generateTrackHeats(eligibleAthletes, currentLanesCount || tournament?.lanesCount || 6);
+  }, [eligibleAthletes, currentLanesCount, tournament?.lanesCount]);
 
-  const activeHeat = heats[selectedHeatIndex] || heats[0] || { lanes: [] };
+  const safeHeatIndex = heats.length > 0 ? Math.min(selectedHeatIndex, heats.length - 1) : 0;
+  const activeHeat = heats[safeHeatIndex] || heats[0] || { lanes: [] };
 
   // Filtrado por buscador en la serie actual
   const displayedLanes = useMemo(() => {
@@ -151,7 +184,7 @@ export default function TrackJudgeView({
     const term = searchTerm.toLowerCase().trim();
     const resultsInOtherHeats = [];
     heats.forEach((h, hIdx) => {
-      if (hIdx === selectedHeatIndex) return;
+      if (hIdx === safeHeatIndex) return;
       (h.lanes || []).forEach(ath => {
         if (
           ath.fullName.toLowerCase().includes(term) ||
@@ -167,7 +200,7 @@ export default function TrackJudgeView({
       });
     });
     return resultsInOtherHeats;
-  }, [heats, selectedHeatIndex, searchTerm]);
+  }, [heats, safeHeatIndex, searchTerm]);
 
   const eventResults = results[activeEvent.id] || {};
   const currentTrackEntries = eventResults.trackEntries || [];
@@ -175,9 +208,9 @@ export default function TrackJudgeView({
   const [localTimes, setLocalTimes] = useState({});
 
   const getRunnerTime = (athleteId) => {
-    if (localTimes[athleteId] !== undefined) return localTimes[athleteId];
+    if (localTimes[athleteId] !== undefined) return localTimes[athleteId] ?? '';
     const found = currentTrackEntries.find(e => e.athleteId === athleteId);
-    return found ? found.timeSeconds : '';
+    return found?.timeSeconds ?? '';
   };
 
   const getRunnerStatus = (athleteId) => {
@@ -193,6 +226,23 @@ export default function TrackJudgeView({
     }));
   };
 
+  const handleClearRunnerTime = (athleteId) => {
+    if (!isAdmin) return;
+    setLocalTimes(prev => ({
+      ...prev,
+      [athleteId]: ''
+    }));
+    const existing = currentTrackEntries.find(e => e.athleteId === athleteId);
+    if (existing) {
+      const updated = currentTrackEntries.map(e =>
+        e.athleteId === athleteId
+          ? { ...e, timeSeconds: null, status: 'pending', statusReason: '' }
+          : e
+      );
+      onSaveTrackResult(activeEvent.id, updated, { gender: currentGender });
+    }
+  };
+
   const handleStatusChange = (athleteId, newStatus) => {
     if (!isAdmin) return;
     const runner = eligibleAthletes.find(a => a.id === athleteId);
@@ -201,12 +251,13 @@ export default function TrackJudgeView({
     const existingEntries = currentTrackEntries.filter(e => e.athleteId !== athleteId);
     const updatedEntry = {
       athleteId,
+      gender: runner.gender || currentGender,
       timeSeconds: newStatus === 'valid' ? (parseTrackTime(localTimes[athleteId]) || null) : null,
       status: newStatus,
       statusReason: newStatus === 'dq' ? 'Salida en falso / Invasión carril' : ''
     };
 
-    onSaveTrackResult(activeEvent.id, [...existingEntries, updatedEntry]);
+    onSaveTrackResult(activeEvent.id, [...existingEntries, updatedEntry], { gender: currentGender });
   };
 
   const handleSaveHeat = () => {
@@ -218,6 +269,7 @@ export default function TrackJudgeView({
     const updatedEntries = [...currentTrackEntries];
 
     (activeHeat.lanes || []).forEach(athlete => {
+      const hasLocalEdit = Object.prototype.hasOwnProperty.call(localTimes, athlete.id);
       const rawVal = localTimes[athlete.id];
       const parsedTime = parseTrackTime(rawVal);
       const existingIdx = updatedEntries.findIndex(e => e.athleteId === athlete.id);
@@ -225,6 +277,7 @@ export default function TrackJudgeView({
       if (parsedTime !== null) {
         const newRecord = {
           athleteId: athlete.id,
+          gender: athlete.gender || currentGender,
           heatNumber: activeHeat.heatNumber,
           laneNumber: athlete.assignedLane,
           timeSeconds: parsedTime,
@@ -236,10 +289,17 @@ export default function TrackJudgeView({
         } else {
           updatedEntries.push(newRecord);
         }
+      } else if (hasLocalEdit && rawVal === '' && existingIdx !== -1) {
+        updatedEntries[existingIdx] = {
+          ...updatedEntries[existingIdx],
+          timeSeconds: null,
+          status: 'pending',
+          statusReason: ''
+        };
       }
     });
 
-    onSaveTrackResult(activeEvent.id, updatedEntries);
+    onSaveTrackResult(activeEvent.id, updatedEntries, { gender: currentGender });
     alert('¡Tiempos guardados y sincronizados con la Mesa de Control!');
   };
 
@@ -296,6 +356,7 @@ export default function TrackJudgeView({
         const existingIdx = updatedEntries.findIndex(e => e.athleteId === athlete.id);
         const newRecord = {
           athleteId: athlete.id,
+          gender: athlete.gender || currentGender,
           heatNumber: activeHeat.heatNumber,
           laneNumber: laneNum,
           timeSeconds: timeVal,
@@ -313,18 +374,23 @@ export default function TrackJudgeView({
 
     if (appliedCount > 0) {
       setLocalTimes(newLocal);
-      onSaveTrackResult(activeEvent.id, updatedEntries);
+      onSaveTrackResult(activeEvent.id, updatedEntries, { gender: currentGender });
     }
   };
 
   const liveRankings = useMemo(() => {
     const combined = eligibleAthletes.map(ath => {
       const recorded = currentTrackEntries.find(e => e.athleteId === ath.id);
+      const hasLocal = Object.prototype.hasOwnProperty.call(localTimes, ath.id);
       const tempVal = localTimes[ath.id];
       const parsedTemp = parseTrackTime(tempVal);
 
-      const timeSeconds = parsedTemp !== null ? parsedTemp : (recorded?.timeSeconds || null);
-      const status = recorded?.status || (timeSeconds ? 'valid' : 'pending');
+      const timeSeconds = hasLocal && tempVal === ''
+        ? null
+        : (parsedTemp !== null ? parsedTemp : (recorded?.timeSeconds || null));
+      const status = (hasLocal && tempVal === '')
+        ? 'pending'
+        : (parsedTemp !== null ? 'valid' : (recorded?.status || (timeSeconds ? 'valid' : 'pending')));
 
       return {
         ...ath,
@@ -547,11 +613,13 @@ export default function TrackJudgeView({
       )}
 
       {/* Selector de Serie y Acciones */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-white border border-slate-200/90 rounded-2xl p-3.5 shadow-xs">
-        <div className="flex items-center space-x-2 overflow-x-auto w-full sm:w-auto pb-1 scrollbar-thin">
-          <span className="text-xs font-bold text-slate-500 uppercase tracking-wider shrink-0">Series:</span>
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-white border border-slate-200/90 rounded-2xl p-3.5 shadow-xs">
+        <div className="flex flex-wrap items-center gap-1.5 flex-1">
+          <span className="text-xs font-bold text-slate-500 uppercase tracking-wider shrink-0 mr-1">Series ({currentLanesCount} carriles):</span>
           {heats.length === 0 ? (
-            <span className="text-xs text-slate-400 italic">Sin corredores inscritos</span>
+            <span className="text-xs text-slate-400 italic">
+              {isRelay ? 'Sin equipos de relevo inscritos' : 'Sin corredores inscritos'}
+            </span>
           ) : (
             heats.map((heat, idx) => (
               <button
@@ -559,7 +627,7 @@ export default function TrackJudgeView({
                 onClick={() => setSelectedHeatIndex(idx)}
                 title={heat.name}
                 className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap shrink-0 transition-all ${
-                  selectedHeatIndex === idx
+                  safeHeatIndex === idx
                     ? 'bg-rose-500 text-white shadow-xs'
                     : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                 }`}
@@ -570,33 +638,7 @@ export default function TrackJudgeView({
           )}
         </div>
 
-        <div className="flex flex-wrap items-center space-x-2 w-full sm:w-auto justify-end gap-y-2">
-          {/* Botón Consola Multi-Carril Minimalista Pastel */}
-          <button
-            onClick={() => {
-              if (!isAdmin) {
-                if (onOpenAdminLogin) onOpenAdminLogin();
-                return;
-              }
-              setIsMultiLaneOpen(true);
-            }}
-            className="px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 rounded-xl text-xs font-bold flex items-center space-x-1.5 transition-colors shadow-2xs"
-            title="Abrir cronómetros de todos los carriles corriendo en vivo"
-          >
-            <Clock className="w-3.5 h-3.5 text-amber-600" />
-            <span>META / Cronometrista</span>
-          </button>
-
-          {/* Botón Juez de Salida Minimalista Pastel */}
-          <button
-            onClick={() => setIsStarterOpen(true)}
-            className="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-200 rounded-xl text-xs font-bold flex items-center space-x-1.5 transition-colors shadow-2xs"
-            title="Abrir pistola y consola de salida oficial"
-          >
-            <Flame className="w-3.5 h-3.5 text-rose-600" />
-            <span>Pistola / Salida</span>
-          </button>
-
+        <div className="flex flex-wrap items-center gap-2 shrink-0 justify-end">
           <button
             onClick={() => {
               if (!isAdmin) {
@@ -614,24 +656,26 @@ export default function TrackJudgeView({
 
           <button
             onClick={() => {
-              // Combinar marcas guardadas con marcas capturadas en vivo en pantalla
-              const liveHeatEntries = (activeHeat.lanes || []).map(ath => {
+              // Combinar marcas guardadas con marcas capturadas en vivo en pantalla de todas las series
+              const liveHeatEntries = (eligibleAthletes || []).map(ath => {
                 const rec = currentTrackEntries.find(e => e.athleteId === ath.id);
+                const hasLocal = Object.prototype.hasOwnProperty.call(localTimes, ath.id);
                 const temp = parseTrackTime(localTimes[ath.id]);
-                const timeSec = temp !== null ? temp : (rec?.timeSeconds || null);
+                const clearedLocally = hasLocal && localTimes[ath.id] === '';
+                const timeSec = clearedLocally ? null : (temp !== null ? temp : (rec?.timeSeconds || null));
+                const laneMatch = heats.flatMap(h => h.lanes || []).find(l => l.id === ath.id);
                 return {
                   athleteId: ath.id,
-                  heatNumber: activeHeat.heatNumber,
-                  laneNumber: ath.assignedLane,
+                  heatNumber: laneMatch?.heatNumber || activeHeat.heatNumber,
+                  laneNumber: laneMatch?.assignedLane || null,
                   timeSeconds: timeSec,
-                  status: rec?.status || (timeSec ? 'valid' : 'pending'),
+                  status: clearedLocally ? 'pending' : (temp !== null ? 'valid' : (rec?.status || (timeSec ? 'valid' : 'pending'))),
                   statusReason: rec?.statusReason || ''
                 };
               });
-              const otherEntries = currentTrackEntries.filter(e => !liveHeatEntries.some(l => l.athleteId === e.athleteId));
-              const mergedForPDF = [...otherEntries, ...liveHeatEntries];
+              const genderLabel = currentGender === 'MIXED' ? 'Combinado Mixto' : currentGender === 'F' ? 'Femenil' : 'Varonil';
 
-              generateOfficialTrackSheetPDF(activeEvent, heats, tournament, mergedForPDF, liveRankings);
+              generateOfficialTrackSheetPDF(activeEvent, heats, tournament, liveHeatEntries, liveRankings, genderLabel);
             }}
             className="px-3 py-1.5 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-xl text-xs font-semibold flex items-center space-x-1.5 transition-colors"
             title="Descargar planilla PDF con los tiempos y lugares oficiales de los corredores"
@@ -652,11 +696,11 @@ export default function TrackJudgeView({
                 <span>{activeHeat.name || 'Serie 1'}</span>
               </h3>
               <p className="text-xs text-slate-500">
-                {isAdmin ? 'Ingresa el tiempo oficial en segundos (ej. 10.52)' : 'Modo consulta de tiempos'}
+                {isAdmin ? 'Ingresa el tiempo oficial en segundos (ej. 10.52 o 1:15.30)' : 'Modo consulta de tiempos'}
               </p>
             </div>
             <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700">
-              {displayedLanes.length} Corredores {searchTerm && '(Filtrados)'}
+              {displayedLanes.length} {displayedLanes.length === 1 ? (isRelay ? 'Equipo' : 'Corredor') : (isRelay ? 'Equipos' : 'Corredores')} {searchTerm && '(Filtrados)'}
             </span>
           </div>
 
@@ -711,29 +755,35 @@ export default function TrackJudgeView({
                         <span className="hidden sm:inline">Cronometrar</span>
                       </button>
 
-                      <div className="relative flex items-center">
+                      <div className={`flex items-center border rounded-xl overflow-hidden ${
+                        !isAdmin
+                          ? 'bg-slate-100 border-slate-200'
+                          : currentStatus === 'valid'
+                          ? 'bg-white border-slate-300 focus-within:ring-2 focus-within:ring-rose-400'
+                          : 'bg-slate-100 border-slate-200'
+                      }`}>
                         <input
                           type="text"
                           value={currentTime}
                           onChange={(e) => handleTimeChange(athlete.id, e.target.value)}
                           placeholder="00.00"
                           readOnly={!isAdmin || currentStatus !== 'valid'}
-                          className={`w-28 border text-center font-athletic text-2xl font-bold rounded-xl py-1 px-2 outline-none transition-all ${
+                          className={`w-24 bg-transparent text-center font-athletic text-xl sm:text-2xl font-bold py-1 pl-2 pr-1 outline-none ${
                             !isAdmin
-                              ? 'bg-slate-100 border-slate-200 text-slate-700 cursor-not-allowed'
+                              ? 'text-slate-700 cursor-not-allowed'
                               : currentStatus === 'valid'
-                              ? 'bg-white border-slate-300 text-slate-900 focus:ring-2 focus:ring-rose-400'
-                              : 'bg-slate-100 border-slate-200 text-slate-400 line-through'
+                              ? 'text-slate-900'
+                              : 'text-slate-400 line-through'
                           }`}
                         />
-                        <span className="absolute right-2 top-2 text-[10px] text-slate-400 font-bold pointer-events-none">seg</span>
+                        <span className="text-[10px] text-slate-400 font-bold pr-2 select-none">seg</span>
                       </div>
 
                       {/* Botón para borrar tiempo por error / equivocación */}
-                      {isAdmin && currentTime && (
+                      {isAdmin && currentTime !== '' && (
                         <button
                           type="button"
-                          onClick={() => handleTimeChange(athlete.id, '')}
+                          onClick={() => handleClearRunnerTime(athlete.id)}
                           className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 border border-slate-200 rounded-xl transition-colors cursor-pointer"
                           title="Borrar tiempo de este competidor (en caso de equivocación)"
                         >
@@ -840,7 +890,7 @@ export default function TrackJudgeView({
                     }`}
                   >
                     <div className="flex items-center space-x-2 truncate">
-                      <span className={`w-5 h-5 rounded-md font-bold flex items-center justify-center text-[11px] ${
+                      <span className={`min-w-[26px] h-6 px-1.5 rounded-md font-bold flex items-center justify-center text-[11px] whitespace-nowrap shrink-0 ${
                         idx === 0 && athlete.timeSeconds ? 'bg-amber-400 text-amber-950 font-black' :
                         idx === 1 && athlete.timeSeconds ? 'bg-slate-300 text-slate-900 font-bold' :
                         idx === 2 && athlete.timeSeconds ? 'bg-amber-700 text-white font-bold' : 'bg-slate-200 text-slate-600'
@@ -853,8 +903,12 @@ export default function TrackJudgeView({
                       </div>
                     </div>
 
-                    <span className="font-athletic text-base font-bold text-slate-900">
-                      {athlete.status === 'valid' ? formatTrackTime(athlete.timeSeconds) : athlete.status?.toUpperCase()}
+                    <span className="font-athletic text-base font-bold text-slate-900 whitespace-nowrap">
+                      {athlete.status === 'valid'
+                        ? formatTrackTime(athlete.timeSeconds)
+                        : athlete.status === 'pending'
+                        ? 'Pendiente'
+                        : athlete.status?.toUpperCase()}
                     </span>
                   </div>
                 );
@@ -864,7 +918,7 @@ export default function TrackJudgeView({
 
           <div className="pt-3 border-t border-slate-100">
             <button
-              onClick={() => onOpenLiveResults(activeEvent.id)}
+              onClick={() => onOpenLiveResults(activeEvent.id, currentGender)}
               className="w-full py-2 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-xl text-xs font-semibold flex items-center justify-center space-x-1 transition-colors"
             >
               <Sparkles className="w-3.5 h-3.5 text-amber-500" />
@@ -896,7 +950,7 @@ export default function TrackJudgeView({
         onClose={() => setIsStarterOpen(false)}
         activeEvent={activeEvent}
         heats={heats}
-        selectedHeatIndex={selectedHeatIndex}
+        selectedHeatIndex={safeHeatIndex}
         onSelectHeatIndex={setSelectedHeatIndex}
         lanesCount={currentLanesCount}
         onUpdateLanesCount={setCurrentLanesCount}
@@ -910,9 +964,10 @@ export default function TrackJudgeView({
         onClose={() => setIsMultiLaneOpen(false)}
         activeEvent={activeEvent}
         heats={heats}
-        selectedHeatIndex={selectedHeatIndex}
+        selectedHeatIndex={safeHeatIndex}
         onSelectHeatIndex={setSelectedHeatIndex}
         lanesCount={currentLanesCount}
+        onUpdateLanesCount={setCurrentLanesCount}
         onApplyTimes={handleApplyMultiLaneTimes}
         isAdmin={isAdmin}
         onOpenAdminLogin={onOpenAdminLogin}

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import Navbar from './components/Navbar';
 import TeacherRegistrationView from './components/TeacherRegistrationView';
 import TrackJudgeView from './components/TrackJudgeView';
@@ -15,6 +15,7 @@ import {
   saveTournamentState,
   purgeAllTournamentData,
   clearSavedTeacherSchool,
+  getRoomCodeFromUrl,
   DEFAULT_TOURNAMENT_INFO,
   STORAGE_KEY
 } from './utils/storage';
@@ -23,16 +24,21 @@ import { OFFICIAL_EVENTS } from './constants/events';
 import { computeTournamentEventStatus } from './utils/athleticsEngine';
 import {
   subscribeToLiveTournament,
-  syncEventUpdateToCloud,
   syncFullTournamentToCloud,
+  syncEventEntriesToCloud,
+  syncSchoolMutationToCloud,
+  syncAthletesMutationToCloud,
+  syncRelayMutationToCloud,
+  syncTournamentSettingsToCloud,
   purgeCloudTournamentData
 } from './services/cloudSync';
 
 export default function App() {
   const [state, setState] = useState(() => {
-    // Si ya existe registro persistido en localStorage (incluso si está en ceros tras vaciar)
+    const urlRoom = getRoomCodeFromUrl();
+    // Si ya existe registro persistido en localStorage (incluso si está en ceros tras vaciar) o viene ?room= en URL
     const raw = typeof localStorage !== 'undefined' ? localStorage.getItem(STORAGE_KEY) : null;
-    if (raw) {
+    if (raw || urlRoom) {
       return loadTournamentState();
     }
     // Solo en la primera apertura sin datos previos se cargan los datos de demostración
@@ -46,9 +52,13 @@ export default function App() {
     };
   });
 
+  const stateRef = useRef(state);
+  stateRef.current = state;
+
   // Pestaña inicial: Portal de Maestros (Inscripciones)
   const [activeTab, setActiveTab] = useState('registration');
   const [selectedPodiumEventId, setSelectedPodiumEventId] = useState('campo_longitud');
+  const [selectedPodiumGender, setSelectedPodiumGender] = useState(null);
 
   // Estado de Administrador (Protege la Mesa de Control y Ajustes)
   const [isAdmin, setIsAdmin] = useState(false);
@@ -93,7 +103,7 @@ export default function App() {
               schools: Array.isArray(cloudData.schools) ? cloudData.schools : prev.schools,
               relays: Array.isArray(cloudData.relays) ? cloudData.relays : prev.relays,
               tournament: cloudData.tournament ? { ...prev.tournament, ...cloudData.tournament } : prev.tournament,
-              activeRaceSession: cloudData.activeRaceSession || prev.activeRaceSession
+              activeRaceSession: cloudData.activeRaceSession !== undefined ? cloudData.activeRaceSession : prev.activeRaceSession
             };
           });
         }
@@ -105,117 +115,250 @@ export default function App() {
 
   const readyAwardsCount = useMemo(() => {
     const statusList = computeTournamentEventStatus(OFFICIAL_EVENTS, state);
-    return statusList.filter(s => s.isReadyForAwards).length;
+    return statusList.reduce((acc, s) => {
+      if (s.isRelay) return acc + (s.isReadyForAwards ? 1 : 0);
+      const maleReady = s.byGender?.M?.isReadyForAwards ? 1 : 0;
+      const femaleReady = s.byGender?.F?.isReadyForAwards ? 1 : 0;
+      return acc + maleReady + femaleReady;
+    }, 0);
   }, [state]);
 
-  // Sincronización automática de cambios de atletas y escuelas con la nube
+  // Sincronización automática de respaldo completo cuando se reemplaza todo el torneo
   const pushStateToCloudIfOnline = (partialOrUpdatedState) => {
-    if (state.cloudSession?.enabled) {
-      syncFullTournamentToCloud(state.cloudSession.roomCode, {
-        ...state,
+    const curr = stateRef.current;
+    if (curr.cloudSession?.enabled) {
+      syncFullTournamentToCloud(curr.cloudSession.roomCode, {
+        ...curr,
         ...partialOrUpdatedState
       });
     }
   };
 
-  // Handlers de Resultados
-  const handleSaveTrackResult = (eventId, trackEntries) => {
-    const updatedResults = {
-      ...state.results,
-      [eventId]: {
-        ...(state.results[eventId] || {}),
-        trackEntries,
-        isAwarded: false,
-        lastUpdated: new Date().toISOString()
-      }
-    };
-
-    setState(prev => ({ ...prev, results: updatedResults }));
-
-    if (state.cloudSession?.enabled) {
-      syncEventUpdateToCloud(state.cloudSession.roomCode, eventId, updatedResults[eventId]);
-    }
-  };
-
-  const handleSaveFieldResult = (eventId, fieldEntries) => {
-    const updatedResults = {
-      ...state.results,
-      [eventId]: {
-        ...(state.results[eventId] || {}),
-        fieldEntries,
-        isAwarded: false,
-        lastUpdated: new Date().toISOString()
-      }
-    };
-
-    setState(prev => ({ ...prev, results: updatedResults }));
-
-    if (state.cloudSession?.enabled) {
-      syncEventUpdateToCloud(state.cloudSession.roomCode, eventId, updatedResults[eventId]);
-    }
-  };
-
-  const handleMarkEventAwarded = (eventId) => {
-    const updatedResults = {
-      ...state.results,
-      [eventId]: {
-        ...(state.results[eventId] || {}),
-        isAwarded: true
-      }
-    };
-    setState(prev => ({ ...prev, results: updatedResults }));
-    if (state.cloudSession?.enabled) {
-      syncEventUpdateToCloud(state.cloudSession.roomCode, eventId, updatedResults[eventId]);
-    }
-  };
-
-  // Handlers de Alumnos con Autoguardado en Nube Inmediato
-  const handleRegisterAthlete = (athlete) => {
-    setState(prev => {
-      const updatedAthletes = [...prev.athletes, athlete];
-      const nextState = { ...prev, athletes: updatedAthletes };
-      pushStateToCloudIfOnline(nextState);
-      return nextState;
+  // Handlers de Resultados (fusión atómica por athleteId/teamId para evitar sobreescrituras entre estaciones)
+  const mergeEntriesById = (existingList = [], incomingList = []) => {
+    const map = new Map();
+    existingList.forEach(item => {
+      const key = item?.athleteId || item?.id;
+      if (key) map.set(key, item);
     });
+    incomingList.forEach(item => {
+      const key = item?.athleteId || item?.id;
+      if (key) map.set(key, item);
+    });
+    return Array.from(map.values());
+  };
+
+  const handleSaveTrackResult = (eventId, trackEntries, meta = {}) => {
+    const curr = stateRef.current;
+    const prevEvent = curr.results?.[eventId] || {};
+    const mergedTrack = mergeEntriesById(prevEvent.trackEntries || [], trackEntries || []);
+
+    setState(prev => {
+      const evPrev = prev.results?.[eventId] || {};
+      const nextTrack = mergeEntriesById(evPrev.trackEntries || [], trackEntries || []);
+      const nextAwardedByGender = meta.gender
+        ? { ...(evPrev.awardedByGender || {}), [meta.gender]: false }
+        : evPrev.awardedByGender;
+      return {
+        ...prev,
+        results: {
+          ...prev.results,
+          [eventId]: {
+            ...evPrev,
+            trackEntries: nextTrack,
+            ...(nextAwardedByGender ? { awardedByGender: nextAwardedByGender } : {}),
+            isAwarded: false,
+            lastUpdated: new Date().toISOString()
+          }
+        }
+      };
+    });
+
+    if (curr.cloudSession?.enabled) {
+      syncEventEntriesToCloud(curr.cloudSession.roomCode, eventId, {
+        type: 'track',
+        entries: trackEntries || mergedTrack,
+        resetAwarded: true,
+        awardedGender: meta.gender || null,
+        fallbackResults: curr.results
+      });
+    }
+  };
+
+  const handleSaveFieldResult = (eventId, fieldEntries, meta = {}) => {
+    const curr = stateRef.current;
+    const prevEvent = curr.results?.[eventId] || {};
+    const mergedField = mergeEntriesById(prevEvent.fieldEntries || [], fieldEntries || []);
+
+    setState(prev => {
+      const evPrev = prev.results?.[eventId] || {};
+      const nextField = mergeEntriesById(evPrev.fieldEntries || [], fieldEntries || []);
+      const nextAwardedByGender = meta.gender
+        ? { ...(evPrev.awardedByGender || {}), [meta.gender]: false }
+        : evPrev.awardedByGender;
+      return {
+        ...prev,
+        results: {
+          ...prev.results,
+          [eventId]: {
+            ...evPrev,
+            fieldEntries: nextField,
+            ...(nextAwardedByGender ? { awardedByGender: nextAwardedByGender } : {}),
+            isAwarded: false,
+            lastUpdated: new Date().toISOString()
+          }
+        }
+      };
+    });
+
+    if (curr.cloudSession?.enabled) {
+      syncEventEntriesToCloud(curr.cloudSession.roomCode, eventId, {
+        type: 'field',
+        entries: fieldEntries || mergedField,
+        resetAwarded: true,
+        awardedGender: meta.gender || null,
+        fallbackResults: curr.results
+      });
+    }
+  };
+
+  const handleMarkEventAwarded = (eventId, gender = null) => {
+    const curr = stateRef.current;
+
+    setState(prev => {
+      const evPrev = prev.results?.[eventId] || {};
+      const nextAwardedByGender = gender
+        ? { ...(evPrev.awardedByGender || {}), [gender]: true }
+        : evPrev.awardedByGender;
+      return {
+        ...prev,
+        results: {
+          ...prev.results,
+          [eventId]: {
+            ...evPrev,
+            ...(nextAwardedByGender ? { awardedByGender: nextAwardedByGender } : {}),
+            isAwarded: gender ? evPrev.isAwarded : true
+          }
+        }
+      };
+    });
+
+    if (curr.cloudSession?.enabled) {
+      syncEventEntriesToCloud(curr.cloudSession.roomCode, eventId, {
+        type: 'track',
+        entries: null,
+        resetAwarded: false,
+        awardedGender: gender,
+        isAwarded: true,
+        fallbackResults: curr.results
+      });
+    }
+  };
+
+  // Handlers de Alumnos con Transacciones Atómicas en Nube (sin efectos dentro de setState)
+  const handleRegisterAthlete = (athlete) => {
+    const curr = stateRef.current;
+    setState(prev => ({
+      ...prev,
+      athletes: [...prev.athletes.filter(a => a.id !== athlete.id), athlete]
+    }));
+
+    if (curr.cloudSession?.enabled) {
+      syncAthletesMutationToCloud(curr.cloudSession.roomCode, {
+        upsert: [athlete],
+        fallbackAthletes: curr.athletes
+      }).then(res => {
+        if (res?.success && res.reassignedCount > 0 && Array.isArray(res.athletes)) {
+          setState(prev => ({ ...prev, athletes: res.athletes }));
+        }
+      });
+    }
   };
 
   const handleRegisterBatchAthletes = (batchList) => {
-    setState(prev => {
-      const updatedAthletes = [...prev.athletes, ...batchList];
-      const nextState = { ...prev, athletes: updatedAthletes };
-      pushStateToCloudIfOnline(nextState);
-      return nextState;
-    });
+    if (!Array.isArray(batchList) || batchList.length === 0) return;
+    const curr = stateRef.current;
+    const batchIds = new Set(batchList.map(b => b.id));
+
+    setState(prev => ({
+      ...prev,
+      athletes: [...prev.athletes.filter(a => !batchIds.has(a.id)), ...batchList]
+    }));
+
+    if (curr.cloudSession?.enabled) {
+      syncAthletesMutationToCloud(curr.cloudSession.roomCode, {
+        upsert: batchList,
+        fallbackAthletes: curr.athletes
+      }).then(res => {
+        if (res?.success && res.reassignedCount > 0 && Array.isArray(res.athletes)) {
+          setState(prev => ({ ...prev, athletes: res.athletes }));
+        }
+      });
+    }
   };
 
   const handleUpdateAthlete = (updatedAthlete) => {
-    setState(prev => {
-      const updatedAthletes = prev.athletes.map(a => a.id === updatedAthlete.id ? updatedAthlete : a);
-      const nextState = { ...prev, athletes: updatedAthletes };
-      pushStateToCloudIfOnline(nextState);
-      return nextState;
-    });
+    const curr = stateRef.current;
+    setState(prev => ({
+      ...prev,
+      athletes: prev.athletes.map(a => a.id === updatedAthlete.id ? updatedAthlete : a)
+    }));
+
+    if (curr.cloudSession?.enabled) {
+      syncAthletesMutationToCloud(curr.cloudSession.roomCode, {
+        upsert: [updatedAthlete],
+        fallbackAthletes: curr.athletes
+      });
+    }
   };
 
   const handleDeleteAthlete = (athleteId) => {
-    setState(prev => {
-      const updatedAthletes = prev.athletes.filter(a => a.id !== athleteId);
-      const nextState = { ...prev, athletes: updatedAthletes };
-      pushStateToCloudIfOnline(nextState);
-      return nextState;
-    });
+    const curr = stateRef.current;
+    setState(prev => ({
+      ...prev,
+      athletes: prev.athletes.filter(a => a.id !== athleteId)
+    }));
+
+    if (curr.cloudSession?.enabled) {
+      syncAthletesMutationToCloud(curr.cloudSession.roomCode, {
+        deleteIds: [athleteId],
+        fallbackAthletes: curr.athletes
+      });
+    }
   };
 
   const handleSaveRelay = (relayTeam) => {
-    setState(prev => {
-      const updatedRelays = [...(prev.relays || []).filter(r => r.id !== relayTeam.id), relayTeam];
-      const nextState = { ...prev, relays: updatedRelays };
-      pushStateToCloudIfOnline(nextState);
-      return nextState;
-    });
+    const curr = stateRef.current;
+    setState(prev => ({
+      ...prev,
+      relays: [...(prev.relays || []).filter(r => r.id !== relayTeam.id), relayTeam]
+    }));
+
+    if (curr.cloudSession?.enabled) {
+      syncRelayMutationToCloud(curr.cloudSession.roomCode, {
+        upsertRelay: relayTeam,
+        fallbackRelays: curr.relays
+      });
+    }
+  };
+
+  const handleDeleteRelay = (relayId) => {
+    const curr = stateRef.current;
+    setState(prev => ({
+      ...prev,
+      relays: (prev.relays || []).filter(r => r.id !== relayId)
+    }));
+
+    if (curr.cloudSession?.enabled) {
+      syncRelayMutationToCloud(curr.cloudSession.roomCode, {
+        deleteRelayId: relayId,
+        fallbackRelays: curr.relays
+      });
+    }
   };
 
   const handleSaveSchool = (schoolData) => {
+    const curr = stateRef.current;
     setState(prev => {
       const existingIdx = (prev.schools || []).findIndex(s => s.id === schoolData.id);
       let updatedSchools;
@@ -225,22 +368,24 @@ export default function App() {
       } else {
         updatedSchools = [...prev.schools, schoolData];
       }
-      const nextState = { ...prev, schools: updatedSchools };
-      pushStateToCloudIfOnline(nextState);
-      return nextState;
+      return { ...prev, schools: updatedSchools };
     });
+
+    if (curr.cloudSession?.enabled) {
+      syncSchoolMutationToCloud(curr.cloudSession.roomCode, schoolData, curr.schools);
+    }
   };
 
   const handleSaveTournament = (updatedTournament, fullReplacement = null) => {
+    const curr = stateRef.current;
     if (fullReplacement) {
       setState(fullReplacement);
       pushStateToCloudIfOnline(fullReplacement);
     } else {
-      setState(prev => {
-        const nextState = { ...prev, tournament: updatedTournament };
-        pushStateToCloudIfOnline(nextState);
-        return nextState;
-      });
+      setState(prev => ({ ...prev, tournament: updatedTournament }));
+      if (curr.cloudSession?.enabled) {
+        syncTournamentSettingsToCloud(curr.cloudSession.roomCode, updatedTournament);
+      }
     }
   };
 
@@ -288,8 +433,9 @@ export default function App() {
     }
   };
 
-  const handleSelectEventForPodium = (eventId) => {
+  const handleSelectEventForPodium = (eventId, gender = null) => {
     setSelectedPodiumEventId(eventId);
+    setSelectedPodiumGender(gender);
     setActiveTab('live_results');
   };
 
@@ -343,6 +489,7 @@ export default function App() {
             onUpdateAthlete={handleUpdateAthlete}
             onDeleteAthlete={handleDeleteAthlete}
             onSaveRelay={handleSaveRelay}
+            onDeleteRelay={handleDeleteRelay}
             isAdmin={isAdmin}
             onOpenAdminLogin={() => setIsAdminLoginOpen(true)}
             onOpenControlDesk={() => setActiveTab('control_desk')}
@@ -353,6 +500,7 @@ export default function App() {
           <TrackJudgeView
             tournament={state.tournament}
             athletes={state.athletes}
+            relays={state.relays || []}
             schools={state.schools}
             results={state.results}
             onSaveTrackResult={handleSaveTrackResult}
@@ -382,9 +530,11 @@ export default function App() {
           <AthletesRosterView
             tournament={state.tournament}
             athletes={state.athletes}
+            relays={state.relays || []}
             schools={state.schools}
             onUpdateAthlete={handleUpdateAthlete}
             onDeleteAthlete={handleDeleteAthlete}
+            onDeleteRelay={handleDeleteRelay}
             isAdmin={isAdmin}
             onOpenAdminLogin={() => setIsAdminLoginOpen(true)}
           />
@@ -394,6 +544,7 @@ export default function App() {
           <ControlDeskView
             tournament={state.tournament}
             athletes={state.athletes}
+            relays={state.relays || []}
             schools={state.schools}
             results={state.results}
             onSelectEventForPodium={handleSelectEventForPodium}
@@ -406,9 +557,11 @@ export default function App() {
           <LiveResultsView
             tournament={state.tournament}
             athletes={state.athletes}
+            relays={state.relays || []}
             schools={state.schools}
             results={state.results}
             initialEventId={selectedPodiumEventId}
+            initialGender={selectedPodiumGender}
           />
         )}
       </main>

@@ -21,9 +21,13 @@ export function evaluateFieldAttempts(attempts = []) {
   const secondBestMark = validMarks.length > 1 ? validMarks[1] : 0;
   const thirdBestMark = validMarks.length > 2 ? validMarks[2] : 0;
 
-  // Determinar si todos los intentos fueron nulos o si no se presentó
-  const totalRecorded = attempts.filter(a => a && a.status).length;
-  const hasOnlyFouls = totalRecorded > 0 && validMarks.length === 0;
+  // Ignorar 'pending' para no marcar prematuramente como SM a atletas aún sin intentos capturados
+  const recordedAttempts = attempts.filter(a => a && a.status && a.status !== 'pending');
+  const hasFoulAttempt = recordedAttempts.some(a => a.status === 'foul');
+  const hasDnsAttempt = recordedAttempts.some(a => a.status === 'dns');
+  const isPending = recordedAttempts.length === 0;
+  const hasOnlyFouls = recordedAttempts.length > 0 && validMarks.length === 0 && hasFoulAttempt;
+  const hasOnlyPasses = recordedAttempts.length > 0 && validMarks.length === 0 && !hasFoulAttempt && !hasDnsAttempt;
 
   return {
     bestMark,
@@ -32,6 +36,9 @@ export function evaluateFieldAttempts(attempts = []) {
     validMarksCount: validMarks.length,
     hasValidMark: validMarks.length > 0,
     hasOnlyFouls,
+    hasOnlyPasses,
+    isPending,
+    recordedCount: recordedAttempts.length,
     attemptsDetails: attempts
   };
 }
@@ -55,7 +62,10 @@ export function rankFieldEventCompetitors(competitors = []) {
     // Si uno no tiene marca válida y el otro sí, el que tiene marca va primero
     if (a.hasValidMark && !b.hasValidMark) return -1;
     if (!a.hasValidMark && b.hasValidMark) return 1;
-    if (!a.hasValidMark && !b.hasValidMark) return 0;
+    if (!a.hasValidMark && !b.hasValidMark) {
+      const rankNonValid = (item) => (item.hasOnlyFouls ? 1 : (item.hasOnlyPasses ? 2 : (item.isPending ? 4 : 3)));
+      return rankNonValid(a) - rankNonValid(b);
+    }
 
     // 1. Criterio Maestro: Mejor marca (distancia máxima)
     if (Math.abs(b.bestMark - a.bestMark) > 0.0001) {
@@ -85,11 +95,30 @@ export function rankFieldEventCompetitors(competitors = []) {
     let tieNote = '';
 
     if (!current.hasValidMark) {
+      let statusLabel = 'DNS';
+      let statusNote = 'No se presentó (DNS)';
+      let fallbackOrder = 997;
+
+      if (current.isPending) {
+        statusLabel = 'Pendiente';
+        statusNote = 'Sin intentos registrados';
+        fallbackOrder = 999;
+      } else if (current.hasOnlyFouls) {
+        const foulCount = (current.attemptsDetails || []).filter(a => a && a.status === 'foul').length;
+        statusLabel = 'SM';
+        statusNote = `${foulCount} ${foulCount === 1 ? 'intento nulo' : 'intentos nulos'} (Sin Marca)`;
+        fallbackOrder = 998;
+      } else if (current.hasOnlyPasses) {
+        statusLabel = 'PASA';
+        statusNote = 'Pasó sus intentos';
+        fallbackOrder = 997;
+      }
+
       ranked.push({
         ...current,
-        rank: current.hasOnlyFouls ? 'SM' : 'DNS', // SM = Sin Marca / Nulo en todos
-        rankNumber: 999,
-        tieNote: current.hasOnlyFouls ? '3 intentos nulos (Sin Marca)' : 'No se presentó (DNS)'
+        rank: statusLabel,
+        rankNumber: fallbackOrder,
+        tieNote: statusNote
       });
       continue;
     }
@@ -146,20 +175,23 @@ export function rankTrackEventRunners(runners = []) {
   if (!Array.isArray(runners) || runners.length === 0) return [];
 
   const validRunners = [];
-  const invalidRunners = [];
+  const specialRunners = [];
+  const pendingRunners = [];
 
   runners.forEach(r => {
-    if (r.status === 'valid' && typeof r.timeSeconds === 'number' && r.timeSeconds > 0) {
+    const st = (r.status || '').toLowerCase();
+    if (st === 'valid' && typeof r.timeSeconds === 'number' && r.timeSeconds > 0) {
       validRunners.push(r);
+    } else if (st === 'dns' || st === 'dnf' || st === 'dq' || st === 'sm') {
+      specialRunners.push(r);
     } else {
-      invalidRunners.push(r);
+      pendingRunners.push(r);
     }
   });
 
   // Ordenar válidos de MENOR tiempo a MAYOR tiempo (más rápido primero)
   validRunners.sort((a, b) => a.timeSeconds - b.timeSeconds);
 
-  let currentRank = 1;
   const ranked = [];
 
   for (let i = 0; i < validRunners.length; i++) {
@@ -184,13 +216,22 @@ export function rankTrackEventRunners(runners = []) {
     }
   }
 
-  // Agregar los no válidos al final (DNS, DNF, DQ)
-  invalidRunners.forEach(inv => {
+  // Agregar estados oficiales no válidos (DNS, DNF, DQ) y luego pendientes sin marca
+  specialRunners.forEach(inv => {
     ranked.push({
       ...inv,
       rank: inv.status?.toUpperCase() || 'DESC',
-      rankNumber: 999,
+      rankNumber: 990,
       tieNote: inv.statusReason || ''
+    });
+  });
+
+  pendingRunners.forEach(pen => {
+    ranked.push({
+      ...pen,
+      rank: 'Pendiente',
+      rankNumber: 999,
+      tieNote: pen.statusReason || 'Tiempo pendiente'
     });
   });
 

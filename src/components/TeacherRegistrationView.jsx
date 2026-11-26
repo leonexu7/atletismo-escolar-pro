@@ -34,6 +34,8 @@ import { SAVED_SCHOOL_ID_KEY, SAVED_SCHOOL_INFO_KEY } from '../utils/storage';
 import RelayBuilderModal from './RelayBuilderModal';
 import SchoolSelectorModal from './SchoolSelectorModal';
 
+const TEACHER_PAGE_SIZE = 30;
+
 export default function TeacherRegistrationView({
   tournament,
   schools = [],
@@ -45,22 +47,26 @@ export default function TeacherRegistrationView({
   onUpdateAthlete,
   onDeleteAthlete,
   onSaveRelay,
+  onDeleteRelay,
   isAdmin = false,
   onOpenAdminLogin,
   onOpenControlDesk
 }) {
   const [isSchoolModalOpen, setIsSchoolModalOpen] = useState(false);
 
-  // Datos de la Escuela del Maestro (null en la primera visita hasta que registre o elija su escuela)
+  // Datos de la Escuela del Maestro (prioriza SAVED_SCHOOL_ID_KEY para evitar corrupción multi-pestaña)
   const [schoolInfo, setSchoolInfo] = useState(() => {
     try {
+      const savedId = localStorage.getItem(SAVED_SCHOOL_ID_KEY);
+      if (!savedId) return null;
+
       const saved = localStorage.getItem(SAVED_SCHOOL_INFO_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (parsed && parsed.id && parsed.name) return parsed;
+        if (parsed && parsed.id === savedId && parsed.name) return parsed;
       }
-      const savedId = localStorage.getItem(SAVED_SCHOOL_ID_KEY);
-      if (savedId && Array.isArray(schools)) {
+
+      if (Array.isArray(schools)) {
         const found = schools.find(s => s.id === savedId);
         if (found) return found;
       }
@@ -69,7 +75,7 @@ export default function TeacherRegistrationView({
     return null;
   });
 
-  // Sincronizar cambios desde la nube o limpiar si el torneo fue vaciado a cero
+  // Sincronizar cambios desde la nube o limpiar si el torneo fue vaciado a cero sin pisar otra pestaña
   useEffect(() => {
     try {
       const savedId = localStorage.getItem(SAVED_SCHOOL_ID_KEY);
@@ -77,7 +83,8 @@ export default function TeacherRegistrationView({
         if (schoolInfo !== null) setSchoolInfo(null);
         return;
       }
-      if (schoolInfo && Array.isArray(schools)) {
+
+      if (schoolInfo && schoolInfo.id === savedId && Array.isArray(schools)) {
         const found = schools.find(s => s.id === schoolInfo.id);
         if (found) {
           const synced = {
@@ -86,8 +93,15 @@ export default function TeacherRegistrationView({
           };
           if (JSON.stringify(synced) !== JSON.stringify(schoolInfo)) {
             setSchoolInfo(synced);
-            localStorage.setItem(SAVED_SCHOOL_INFO_KEY, JSON.stringify(synced));
+            if (localStorage.getItem(SAVED_SCHOOL_ID_KEY) === synced.id) {
+              localStorage.setItem(SAVED_SCHOOL_INFO_KEY, JSON.stringify(synced));
+            }
           }
+        }
+      } else if (!schoolInfo && Array.isArray(schools)) {
+        const found = schools.find(s => s.id === savedId);
+        if (found) {
+          setSchoolInfo(found);
         }
       }
     } catch (_) {}
@@ -114,8 +128,10 @@ export default function TeacherRegistrationView({
     eventIds: []
   });
 
-  // Estado del modal de edición de competidor
+  // Estado del modal de edición de competidor y mensajes inline
   const [editingAthlete, setEditingAthlete] = useState(null);
+  const [formError, setFormError] = useState('');
+  const [editFormError, setEditFormError] = useState('');
 
   // Verificación de fecha límite de inscripciones
   const isDeadlineExpired = isRegistrationDeadlineExpired(tournament);
@@ -123,15 +139,25 @@ export default function TeacherRegistrationView({
 
   const [searchTerm, setSearchTerm] = useState('');
   const [filterGender, setFilterGender] = useState('ALL');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [showAllAthletes, setShowAllAthletes] = useState(false);
   const [isRelayModalOpen, setIsRelayModalOpen] = useState(false);
   const [excelLoading, setExcelLoading] = useState(false);
   const [successNotice, setSuccessNotice] = useState('');
 
   const fileInputRef = useRef(null);
 
-  // Alumnos pertenecientes a la escuela activa (vacío si aún no registra/elige escuela)
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, filterGender, schoolInfo?.id]);
+
+  // Alumnos y relevos pertenecientes a la escuela activa
   const schoolAthletes = schoolInfo
     ? athletes.filter(a => a.schoolId === schoolInfo.id || a.schoolName === schoolInfo.name)
+    : [];
+
+  const schoolRelays = schoolInfo
+    ? relays.filter(r => r.schoolId === schoolInfo.id || r.baseSchoolName === schoolInfo.name || r.schoolName === schoolInfo.name)
     : [];
 
   const handleToggleEvent = (eventId, formSetter, currentList) => {
@@ -140,10 +166,20 @@ export default function TeacherRegistrationView({
 
     if (isAlready) {
       next = currentList.filter(id => id !== eventId);
+      setFormError('');
     } else {
       const ev = OFFICIAL_EVENTS.find(e => e.id === eventId);
       const isIndividual = ev?.type !== 'relevo' && !eventId.includes('relevo');
       const isRelay = ev?.type === 'relevo' || eventId.includes('relevo');
+
+      if (athleteForm.gender === 'M' && eventId === 'relevo_4x75m_femenil') {
+        setFormError('Un alumno varonil no puede inscribirse en Relevo 4x75m Femenil.');
+        return;
+      }
+      if (athleteForm.gender === 'F' && eventId === 'relevo_4x75m_varonil') {
+        setFormError('Una alumna femenil no puede inscribirse en Relevo 4x75m Varonil.');
+        return;
+      }
 
       const currentIndividuals = currentList.filter(id => {
         const item = OFFICIAL_EVENTS.find(e => e.id === id);
@@ -156,15 +192,16 @@ export default function TeacherRegistrationView({
       });
 
       if (isIndividual && currentIndividuals.length >= PARTICIPATION_LIMITS.MAX_INDIVIDUAL_EVENTS) {
-        alert(`Reglamento del Torneo: Máximo ${PARTICIPATION_LIMITS.MAX_INDIVIDUAL_EVENTS} pruebas individuales por alumno.`);
+        setFormError(`Reglamento del Torneo: Máximo ${PARTICIPATION_LIMITS.MAX_INDIVIDUAL_EVENTS} pruebas individuales por alumno.`);
         return;
       }
 
       if (isRelay && currentRelays.length >= PARTICIPATION_LIMITS.MAX_RELAY_EVENTS) {
-        alert(`Reglamento del Torneo: Máximo ${PARTICIPATION_LIMITS.MAX_RELAY_EVENTS} pruebas de equipo / relevos por alumno.`);
+        setFormError(`Reglamento del Torneo: Máximo ${PARTICIPATION_LIMITS.MAX_RELAY_EVENTS} pruebas de equipo / relevos por alumno.`);
         return;
       }
 
+      setFormError('');
       next = [...currentList, eventId];
     }
 
@@ -173,37 +210,53 @@ export default function TeacherRegistrationView({
 
   const handleRegisterSubmit = (e) => {
     e.preventDefault();
+    setFormError('');
 
     if (!schoolInfo) {
-      alert('Primero debes registrar o seleccionar tu escuela antes de inscribir alumnos.');
+      setFormError('Primero debes registrar o seleccionar tu escuela antes de inscribir alumnos.');
       setIsSchoolModalOpen(true);
       return;
     }
 
     if (isLockedForTeacher) {
-      alert(`El período oficial de inscripciones concluyó el ${formatDeadlineFriendly(tournament.registrationDeadline)}. Los maestros ya no pueden registrar alumnos extemporáneos sin clave de Mesa de Control.`);
+      setFormError(`El período oficial de inscripciones concluyó el ${formatDeadlineFriendly(tournament.registrationDeadline)}.`);
       return;
     }
 
     if (!athleteForm.fullName.trim()) {
-      alert('Por favor ingresa el nombre completo del alumno.');
+      setFormError('Por favor ingresa el nombre completo del alumno.');
       return;
     }
 
     if (athleteForm.eventIds.length === 0) {
-      alert('Selecciona al menos una prueba para el alumno.');
+      setFormError('Selecciona al menos una prueba para el alumno.');
       return;
+    }
+
+    const usedBibs = new Set(athletes.map(a => String(a.bibNumber ?? '').trim()).filter(Boolean));
+    let assignedBib;
+    if (String(athleteForm.bibNumber ?? '').trim() !== '') {
+      const parsedBib = parseInt(athleteForm.bibNumber, 10);
+      if (isNaN(parsedBib) || parsedBib <= 0) {
+        setFormError('El número de dorsal debe ser un entero positivo.');
+        return;
+      }
+      if (usedBibs.has(String(parsedBib))) {
+        const owner = athletes.find(a => String(a.bibNumber ?? '').trim() === String(parsedBib));
+        setFormError(`El dorsal #${parsedBib} ya está asignado a ${owner?.fullName || 'otro competidor'}. Deja el campo vacío para asignar uno automático.`);
+        return;
+      }
+      assignedBib = parsedBib;
+    } else {
+      let maxExistingBib = athletes.reduce((max, a) => Math.max(max, parseInt(a.bibNumber, 10) || 0), 100);
+      assignedBib = maxExistingBib + 1;
+      while (usedBibs.has(String(assignedBib))) assignedBib++;
     }
 
     const isUnified = (tournament?.categoryGroupingMode || 'unified') === 'unified';
     const calculatedCategory = isUnified
       ? 'primaria_abierta'
       : (athleteForm.schoolGrade === '3' || athleteForm.schoolGrade === '4' ? 'infantil_menor' : 'infantil_mayor');
-
-    const maxExistingBib = athletes.reduce((max, a) => Math.max(max, parseInt(a.bibNumber, 10) || 0), 100);
-    const assignedBib = athleteForm.bibNumber
-      ? parseInt(athleteForm.bibNumber, 10)
-      : maxExistingBib + 1;
 
     const newAthlete = {
       id: `ath-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
@@ -216,7 +269,7 @@ export default function TeacherRegistrationView({
     };
 
     onRegisterAthlete(newAthlete);
-    setSuccessNotice(`¡${newAthlete.fullName} inscrito correctamente en ${newAthlete.eventIds.length} prueba(s)!`);
+    setSuccessNotice(`¡${newAthlete.fullName} (#${assignedBib}) inscrito correctamente en ${newAthlete.eventIds.length} prueba(s)!`);
     setTimeout(() => setSuccessNotice(''), 4000);
 
     setAthleteForm({
@@ -232,20 +285,38 @@ export default function TeacherRegistrationView({
   // Guardar edición de un atleta existente
   const handleSaveEditedAthlete = (e) => {
     e.preventDefault();
+    setEditFormError('');
 
     if (isLockedForTeacher) {
-      alert(`El período de inscripciones cerró el ${formatDeadlineFriendly(tournament.registrationDeadline)}. No es posible modificar datos de alumnos.`);
+      setEditFormError(`El período de inscripciones cerró el ${formatDeadlineFriendly(tournament.registrationDeadline)}. No es posible modificar datos.`);
       return;
     }
 
     if (!editingAthlete.fullName?.trim()) {
-      alert('El nombre es obligatorio.');
+      setEditFormError('El nombre es obligatorio.');
       return;
     }
 
     if (!editingAthlete.eventIds || editingAthlete.eventIds.length === 0) {
-      alert('Debes asignarle al menos una prueba.');
+      setEditFormError('Debes asignarle al menos una prueba.');
       return;
+    }
+
+    let cleanBib = editingAthlete.bibNumber;
+    if (cleanBib !== null && cleanBib !== undefined && String(cleanBib).trim() !== '') {
+      const parsedBib = parseInt(cleanBib, 10);
+      if (isNaN(parsedBib) || parsedBib <= 0) {
+        setEditFormError('El dorsal debe ser un número positivo.');
+        return;
+      }
+      const collision = athletes.find(
+        a => a.id !== editingAthlete.id && String(a.bibNumber ?? '').trim() === String(parsedBib)
+      );
+      if (collision) {
+        setEditFormError(`El dorsal #${parsedBib} ya está asignado a ${collision.fullName}. Elige otro dorsal.`);
+        return;
+      }
+      cleanBib = parsedBib;
     }
 
     const isUnified = (tournament?.categoryGroupingMode || 'unified') === 'unified';
@@ -256,12 +327,13 @@ export default function TeacherRegistrationView({
     const updated = {
       ...editingAthlete,
       fullName: editingAthlete.fullName.trim(),
-      bibNumber: editingAthlete.bibNumber ? parseInt(editingAthlete.bibNumber, 10) : editingAthlete.bibNumber,
+      bibNumber: cleanBib,
       categoryId: calculatedCategory
     };
 
     onUpdateAthlete(updated);
     setEditingAthlete(null);
+    setEditFormError('');
     setSuccessNotice(`¡Datos de ${updated.fullName} actualizados con éxito!`);
     setTimeout(() => setSuccessNotice(''), 4000);
   };
@@ -305,13 +377,29 @@ export default function TeacherRegistrationView({
         return;
       }
 
-      const maxExistingBib = athletes.reduce((max, a) => Math.max(max, parseInt(a.bibNumber, 10) || 0), 100);
-      const formatted = parsedList.map((p, idx) => ({
-        ...p,
-        schoolId: schoolInfo.id,
-        schoolName: schoolInfo.name,
-        bibNumber: p.bibNumber || (maxExistingBib + idx + 1)
-      }));
+      const usedBibs = new Set(athletes.map(a => String(a.bibNumber ?? '').trim()).filter(Boolean));
+      let nextAutoBib = athletes.reduce((max, a) => Math.max(max, parseInt(a.bibNumber, 10) || 0), 100) + 1;
+      const takeNextBib = () => {
+        while (usedBibs.has(String(nextAutoBib))) nextAutoBib++;
+        usedBibs.add(String(nextAutoBib));
+        return nextAutoBib++;
+      };
+
+      const formatted = parsedList.map(p => {
+        let bib = p.bibNumber ? parseInt(p.bibNumber, 10) : null;
+        if (!bib || isNaN(bib) || usedBibs.has(String(bib))) {
+          bib = takeNextBib();
+        } else {
+          usedBibs.add(String(bib));
+          if (bib >= nextAutoBib) nextAutoBib = bib + 1;
+        }
+        return {
+          ...p,
+          schoolId: schoolInfo.id,
+          schoolName: schoolInfo.name,
+          bibNumber: bib
+        };
+      });
 
       onRegisterBatchAthletes(formatted);
       setSuccessNotice(`¡Se inscribieron ${formatted.length} alumnos desde el archivo Excel!`);
@@ -324,8 +412,8 @@ export default function TeacherRegistrationView({
     }
   };
 
-  // Compartir Cédula por WhatsApp
-  const handleSendWhatsAppRoster = () => {
+  // Compartir Cédula por WhatsApp (UTF-8 limpio sin emojis ZWJ que se corrompan al redirigir)
+  const handleSendWhatsAppRoster = async () => {
     if (!schoolInfo) {
       alert('Primero debes registrar o seleccionar tu escuela.');
       setIsSchoolModalOpen(true);
@@ -336,22 +424,43 @@ export default function TeacherRegistrationView({
       return;
     }
 
-    const athletesSummary = schoolAthletes.map((a, i) =>
+    const athletesSummaryLines = schoolAthletes.map((a, i) =>
       `${i + 1}. *${a.fullName}* (#${a.bibNumber || 'S/N'}) - ${a.gender === 'M' ? 'Var' : 'Fem'} ${a.schoolGrade}º Primaria [${(a.eventIds || []).map(id => OFFICIAL_EVENTS.find(e => e.id === id)?.shortName || id).join(', ')}]`
-    ).join('\n');
-
-    const text = encodeURIComponent(
-      `🏃 *CÉDULA DE INSCRIPCIÓN - ATLETISMO ESCOLAR PRIMARIA*\n\n` +
-      `🏫 *Escuela:* ${schoolInfo.name}\n` +
-      `📍 *Zona:* ${schoolInfo.zone}\n` +
-      `👨‍🏫 *Profesor:* ${schoolInfo.coachName}\n\n` +
-      `📊 *Total de Alumnos Inscritos:* ${schoolAthletes.length}\n\n` +
-      `*Padrón de Competidores:*\n` +
-      athletesSummary +
-      `\n\n✅ _Datos cargados en el sistema oficial de atletismo._`
     );
 
-    window.open(`https://wa.me/?text=${text}`, '_blank');
+    const headerText =
+      `*CEDULA DE INSCRIPCION - ATLETISMO ESCOLAR PRIMARIA*\n\n` +
+      `*Escuela:* ${schoolInfo.name}\n` +
+      `*Zona:* ${schoolInfo.zone || 'Sin especificar'}\n` +
+      `*Profesor:* ${schoolInfo.coachName || 'Por asignar'}\n` +
+      `*Total de Alumnos Inscritos:* ${schoolAthletes.length}\n\n`;
+
+    const fullText =
+      headerText +
+      `*Padron de Competidores:*\n` +
+      athletesSummaryLines.join('\n') +
+      `\n\n_Datos cargados en Atletismo Escolar Pro._`;
+
+    // Copiar versión completa al portapapeles siempre como respaldo
+    try {
+      await navigator.clipboard?.writeText(fullText);
+    } catch (_) {}
+
+    // Para no exceder el límite de URL de WhatsApp (~3500 chars), resumir lista en URL si es masiva
+    let waText = fullText;
+    if (encodeURIComponent(fullText).length > 3600) {
+      const previewLines = athletesSummaryLines.slice(0, 25).join('\n');
+      waText =
+        headerText +
+        `*Resumen (primeros 25 de ${schoolAthletes.length} alumnos):*\n` +
+        previewLines +
+        `\n... (+${schoolAthletes.length - 25} alumnos mas)\n\n` +
+        `_La cedula completa (${schoolAthletes.length} atletas) se copio a tu portapapeles para pegarla directamente si lo necesitas._`;
+      setSuccessNotice('Cédula completa copiada al portapapeles y resumen enviado a WhatsApp.');
+      setTimeout(() => setSuccessNotice(''), 5000);
+    }
+
+    window.open(`https://wa.me/?text=${encodeURIComponent(waText)}`, '_blank');
   };
 
   const filteredAthletes = schoolAthletes.filter(ath => {
@@ -360,6 +469,12 @@ export default function TeacherRegistrationView({
     const matchesGender = filterGender === 'ALL' || ath.gender === filterGender;
     return matchesSearch && matchesGender;
   });
+
+  const totalPages = Math.max(1, Math.ceil(filteredAthletes.length / TEACHER_PAGE_SIZE));
+  const safePage = Math.min(currentPage, totalPages);
+  const paginatedAthletes = showAllAthletes
+    ? filteredAthletes
+    : filteredAthletes.slice((safePage - 1) * TEACHER_PAGE_SIZE, safePage * TEACHER_PAGE_SIZE);
 
   return (
     <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 space-y-4">
@@ -759,35 +874,55 @@ export default function TeacherRegistrationView({
                 {OFFICIAL_EVENTS.map(ev => {
                   const isChecked = athleteForm.eventIds.includes(ev.id);
                   const isTrack = isTrackEvent(ev.id);
+                  const isIncompatibleRelay =
+                    (athleteForm.gender === 'M' && ev.id === 'relevo_4x75m_femenil') ||
+                    (athleteForm.gender === 'F' && ev.id === 'relevo_4x75m_varonil');
 
                   return (
-                    <label
+                    <button
                       key={ev.id}
-                      className={`flex items-center justify-between p-2 rounded-xl border text-xs cursor-pointer transition-all ${
-                        isChecked
+                      type="button"
+                      role="checkbox"
+                      aria-checked={isChecked}
+                      disabled={isIncompatibleRelay}
+                      onClick={() => handleToggleEvent(ev.id, setAthleteForm, athleteForm.eventIds)}
+                      className={`w-full flex items-center justify-between p-2 rounded-xl border text-xs transition-all text-left ${
+                        isIncompatibleRelay
+                          ? 'bg-slate-100 border-slate-200 text-slate-400 opacity-50 cursor-not-allowed'
+                          : isChecked
                           ? isTrack
                             ? 'bg-rose-50 border-rose-300 text-rose-900 font-bold'
                             : 'bg-emerald-50 border-emerald-300 text-emerald-900 font-bold'
-                          : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+                          : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100 cursor-pointer'
                       }`}
                     >
                       <div className="flex items-center space-x-2">
-                        <input
-                          type="checkbox"
-                          checked={isChecked}
-                          onChange={() => handleToggleEvent(ev.id, setAthleteForm, athleteForm.eventIds)}
-                          className="rounded text-rose-500 focus:ring-rose-400 h-3.5 w-3.5"
-                        />
+                        <span
+                          className={`w-4 h-4 rounded flex items-center justify-center border text-[10px] font-bold shrink-0 ${
+                            isChecked
+                              ? 'bg-rose-500 border-rose-600 text-white'
+                              : 'bg-white border-slate-300 text-transparent'
+                          }`}
+                        >
+                          ✓
+                        </span>
                         <span>{ev.name}</span>
                       </div>
                       <span className="text-[10px] text-slate-400 uppercase font-semibold">
                         {ev.type}
                       </span>
-                    </label>
+                    </button>
                   );
                 })}
               </div>
             </div>
+
+            {formError && (
+              <div className="p-2.5 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl text-xs font-semibold flex items-center space-x-1.5">
+                <AlertCircle className="w-4 h-4 text-rose-500 shrink-0" />
+                <span>{formError}</span>
+              </div>
+            )}
 
             <button
               type="submit"
@@ -854,7 +989,9 @@ export default function TeacherRegistrationView({
                     : 'Aún no hay alumnos registrados para esta escuela. Usa el formulario a la izquierda o carga tu Excel.'}
                 </div>
               ) : (
-                filteredAthletes.map((ath, idx) => (
+                paginatedAthletes.map((ath, idx) => {
+                  const displayIndex = showAllAthletes ? idx + 1 : (safePage - 1) * TEACHER_PAGE_SIZE + idx + 1;
+                  return (
                   <div
                     key={ath.id}
                     className="py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-slate-50/70 p-2 rounded-xl transition-colors"
@@ -862,7 +999,7 @@ export default function TeacherRegistrationView({
                     <div className="space-y-1">
                       <div className="flex items-center space-x-2">
                         <span className="w-5 h-5 rounded-full bg-slate-100 text-slate-700 text-[11px] font-bold flex items-center justify-center shrink-0">
-                          {idx + 1}
+                          {displayIndex}
                         </span>
                         <span className="font-bold text-slate-900 text-sm">{ath.fullName}</span>
                         <span className="text-[10px] font-mono font-bold px-1.5 py-0.2 rounded bg-slate-100 text-slate-700">
@@ -932,7 +1069,10 @@ export default function TeacherRegistrationView({
                       <div className="flex items-center space-x-2 shrink-0 self-end sm:self-center pl-7 sm:pl-0">
                         <button
                           type="button"
-                          onClick={() => setEditingAthlete({ ...ath })}
+                          onClick={() => {
+                            setEditFormError('');
+                            setEditingAthlete({ ...ath });
+                          }}
                           className="px-3 py-1.5 bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-300 rounded-xl font-bold text-xs flex items-center space-x-1.5 transition-colors shadow-xs"
                           title="Editar los datos y pruebas de este alumno"
                         >
@@ -951,9 +1091,124 @@ export default function TeacherRegistrationView({
                       </div>
                     )}
                   </div>
-                ))
+                  );
+                })
               )}
             </div>
+
+            {/* Paginación de alumnos de la escuela para rendimiento fluido (>200 atletas) */}
+            {filteredAthletes.length > TEACHER_PAGE_SIZE && (
+              <div className="mt-2 pt-2.5 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2 text-xs">
+                <span className="text-slate-500">
+                  {showAllAthletes
+                    ? `Mostrando los ${filteredAthletes.length} alumnos`
+                    : `Mostrando ${(safePage - 1) * TEACHER_PAGE_SIZE + 1}–${Math.min(safePage * TEACHER_PAGE_SIZE, filteredAthletes.length)} de ${filteredAthletes.length}`}
+                </span>
+                <div className="flex items-center space-x-1.5">
+                  {!showAllAthletes && (
+                    <>
+                      <button
+                        type="button"
+                        disabled={safePage <= 1}
+                        onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                        className="px-2 py-1 rounded-lg bg-slate-50 border border-slate-200 text-slate-700 font-semibold hover:bg-slate-100 disabled:opacity-40"
+                      >
+                        Anterior
+                      </button>
+                      <span className="font-mono font-bold text-slate-700 px-1">
+                        {safePage}/{totalPages}
+                      </span>
+                      <button
+                        type="button"
+                        disabled={safePage >= totalPages}
+                        onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                        className="px-2 py-1 rounded-lg bg-slate-50 border border-slate-200 text-slate-700 font-semibold hover:bg-slate-100 disabled:opacity-40"
+                      >
+                        Siguiente
+                      </button>
+                    </>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setShowAllAthletes(prev => !prev)}
+                    className="px-2.5 py-1 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 font-bold hover:bg-rose-100"
+                  >
+                    {showAllAthletes ? 'Paginar (30)' : 'Ver todos'}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Equipos de Relevos Inscritos de esta Escuela */}
+            {schoolInfo && (
+              <div className="mt-4 pt-3 border-t border-slate-200/80">
+                <div className="flex items-center justify-between mb-2">
+                  <h4 className="font-bold text-xs text-slate-800 flex items-center space-x-1.5">
+                    <Users className="w-3.5 h-3.5 text-sky-600" />
+                    <span>Equipos de Relevos Inscritos ({schoolRelays.length})</span>
+                  </h4>
+                  <button
+                    type="button"
+                    onClick={() => setIsRelayModalOpen(true)}
+                    className="text-[11px] font-bold text-sky-700 hover:text-sky-900 bg-sky-50 border border-sky-200 px-2 py-0.5 rounded-lg"
+                  >
+                    + Nuevo Relevo
+                  </button>
+                </div>
+                {schoolRelays.length === 0 ? (
+                  <p className="text-[11px] text-slate-400 italic">
+                    Aún no registras equipos de relevos 4x75m para esta escuela.
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    {schoolRelays.map(relay => {
+                      const memberObjs = (relay.members || []).map(id => athletes.find(a => a.id === id)).filter(Boolean);
+                      const altObj = relay.alternate ? athletes.find(a => a.id === relay.alternate) : null;
+                      return (
+                        <div
+                          key={relay.id}
+                          className="p-2.5 rounded-xl bg-sky-50/70 border border-sky-200 flex items-start justify-between gap-2 text-xs"
+                        >
+                          <div className="space-y-0.5 min-w-0">
+                            <div className="font-bold text-sky-900">
+                              {relay.eventName || OFFICIAL_EVENTS.find(e => e.id === relay.eventId)?.name || 'Relevo 4x75m'}
+                            </div>
+                            <div className="text-[11px] text-slate-700 flex flex-wrap gap-x-2 gap-y-0.5">
+                              {memberObjs.map((m, idx) => (
+                                <span key={m.id}>
+                                  <strong>{idx + 1}ª:</strong> #{m.bibNumber || 'S/N'} {m.fullName} ({m.gender === 'M' ? 'V' : 'F'})
+                                </span>
+                              ))}
+                              {altObj && (
+                                <span className="text-slate-500">
+                                  • <strong>Sup:</strong> #{altObj.bibNumber || 'S/N'} {altObj.fullName}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          {!isLockedForTeacher && onDeleteRelay && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (window.confirm('¿Eliminar este equipo de relevo?')) {
+                                  onDeleteRelay(relay.id);
+                                  setSuccessNotice('Equipo de relevo eliminado.');
+                                  setTimeout(() => setSuccessNotice(''), 3000);
+                                }
+                              }}
+                              className="p-1 text-slate-400 hover:text-rose-600 rounded shrink-0"
+                              title="Eliminar equipo de relevo"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Botón de WhatsApp al final del listado */}
@@ -1095,62 +1350,90 @@ export default function TeacherRegistrationView({
                 <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
                   {OFFICIAL_EVENTS.map(ev => {
                     const isChecked = (editingAthlete.eventIds || []).includes(ev.id);
+                    const isIncompatibleRelay =
+                      (editingAthlete.gender === 'M' && ev.id === 'relevo_4x75m_femenil') ||
+                      (editingAthlete.gender === 'F' && ev.id === 'relevo_4x75m_varonil');
+
                     return (
-                      <label
+                      <button
                         key={ev.id}
-                        className={`flex items-center justify-between p-2 rounded-xl border text-xs cursor-pointer ${
-                          isChecked ? 'bg-sky-50 border-sky-300 text-sky-900 font-bold' : 'bg-slate-50 border-slate-200 text-slate-600'
+                        type="button"
+                        role="checkbox"
+                        aria-checked={isChecked}
+                        disabled={isIncompatibleRelay}
+                        onClick={() => {
+                          const current = editingAthlete.eventIds || [];
+                          const isAlready = current.includes(ev.id);
+                          let next = [];
+                          if (isAlready) {
+                            next = current.filter(id => id !== ev.id);
+                            setEditFormError('');
+                          } else {
+                            const isIndividual = ev.type !== 'relevo' && !ev.id.includes('relevo');
+                            const isRelay = ev.type === 'relevo' || ev.id.includes('relevo');
+                            const indivs = current.filter(id => {
+                              const item = OFFICIAL_EVENTS.find(e => e.id === id);
+                              return item?.type !== 'relevo' && !id.includes('relevo');
+                            });
+                            const relaysCount = current.filter(id => {
+                              const item = OFFICIAL_EVENTS.find(e => e.id === id);
+                              return item?.type === 'relevo' || id.includes('relevo');
+                            });
+
+                            if (isIndividual && indivs.length >= PARTICIPATION_LIMITS.MAX_INDIVIDUAL_EVENTS) {
+                              setEditFormError(`Reglamento del Torneo: Máximo ${PARTICIPATION_LIMITS.MAX_INDIVIDUAL_EVENTS} pruebas individuales.`);
+                              return;
+                            }
+                            if (isRelay && relaysCount.length >= PARTICIPATION_LIMITS.MAX_RELAY_EVENTS) {
+                              setEditFormError(`Reglamento del Torneo: Máximo ${PARTICIPATION_LIMITS.MAX_RELAY_EVENTS} pruebas de equipo / relevos.`);
+                              return;
+                            }
+                            setEditFormError('');
+                            next = [...current, ev.id];
+                          }
+                          setEditingAthlete({ ...editingAthlete, eventIds: next });
+                        }}
+                        className={`w-full flex items-center justify-between p-2 rounded-xl border text-xs text-left ${
+                          isIncompatibleRelay
+                            ? 'bg-slate-100 border-slate-200 text-slate-400 opacity-50 cursor-not-allowed'
+                            : isChecked
+                            ? 'bg-sky-50 border-sky-300 text-sky-900 font-bold'
+                            : 'bg-slate-50 border-slate-200 text-slate-600 cursor-pointer'
                         }`}
                       >
                         <div className="flex items-center space-x-2">
-                          <input
-                            type="checkbox"
-                            checked={isChecked}
-                            onChange={() => {
-                              const current = editingAthlete.eventIds || [];
-                              const isAlready = current.includes(ev.id);
-                              let next = [];
-                              if (isAlready) {
-                                next = current.filter(id => id !== ev.id);
-                              } else {
-                                const isIndividual = ev.type !== 'relevo' && !ev.id.includes('relevo');
-                                const isRelay = ev.type === 'relevo' || ev.id.includes('relevo');
-                                const indivs = current.filter(id => {
-                                  const item = OFFICIAL_EVENTS.find(e => e.id === id);
-                                  return item?.type !== 'relevo' && !id.includes('relevo');
-                                });
-                                const relays = current.filter(id => {
-                                  const item = OFFICIAL_EVENTS.find(e => e.id === id);
-                                  return item?.type === 'relevo' || id.includes('relevo');
-                                });
-
-                                if (isIndividual && indivs.length >= PARTICIPATION_LIMITS.MAX_INDIVIDUAL_EVENTS) {
-                                  alert(`Reglamento del Torneo: Máximo ${PARTICIPATION_LIMITS.MAX_INDIVIDUAL_EVENTS} pruebas individuales.`);
-                                  return;
-                                }
-                                if (isRelay && relays.length >= PARTICIPATION_LIMITS.MAX_RELAY_EVENTS) {
-                                  alert(`Reglamento del Torneo: Máximo ${PARTICIPATION_LIMITS.MAX_RELAY_EVENTS} pruebas de equipo / relevos.`);
-                                  return;
-                                }
-                                next = [...current, ev.id];
-                              }
-                              setEditingAthlete({ ...editingAthlete, eventIds: next });
-                            }}
-                            className="rounded text-sky-600"
-                          />
+                          <span
+                            className={`w-4 h-4 rounded flex items-center justify-center border text-[10px] font-bold shrink-0 ${
+                              isChecked
+                                ? 'bg-sky-600 border-sky-700 text-white'
+                                : 'bg-white border-slate-300 text-transparent'
+                            }`}
+                          >
+                            ✓
+                          </span>
                           <span>{ev.name}</span>
                         </div>
                         <span className="text-[10px] text-slate-400 uppercase font-semibold">{ev.type}</span>
-                      </label>
+                      </button>
                     );
                   })}
                 </div>
               </div>
 
+              {editFormError && (
+                <div className="p-2.5 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl text-xs font-semibold flex items-center space-x-1.5">
+                  <AlertCircle className="w-4 h-4 text-rose-500 shrink-0" />
+                  <span>{editFormError}</span>
+                </div>
+              )}
+
               <div className="pt-3 border-t border-slate-100 flex justify-end space-x-2">
                 <button
                   type="button"
-                  onClick={() => setEditingAthlete(null)}
+                  onClick={() => {
+                    setEditFormError('');
+                    setEditingAthlete(null);
+                  }}
                   className="px-3 py-1.5 text-xs text-slate-600 hover:text-slate-800 font-semibold"
                 >
                   Cancelar
@@ -1174,7 +1457,11 @@ export default function TeacherRegistrationView({
         school={schoolInfo}
         availableAthletes={athletes}
         existingRelays={relays}
-        onSaveRelay={onSaveRelay}
+        onSaveRelay={(team) => {
+          onSaveRelay(team);
+          setSuccessNotice(`¡Equipo de ${team.eventName} guardado exitosamente para ${team.schoolName}!`);
+          setTimeout(() => setSuccessNotice(''), 4500);
+        }}
       />
 
       {/* Modal de Selección y Registro de Escuela con Anti-Duplicados */}
